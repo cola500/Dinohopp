@@ -5,15 +5,26 @@ category: build
 status: active
 last_updated: 2026-05-18
 sections:
+  - Live URLs
   - Snabbstart
   - Bygga lokalt
   - Testa lokalt (Mac)
-  - Publicera till GitHub Pages
+  - Ny deploy efter ändringar
   - Publicera till itch.io
   - Mobilbrowser-risker
 ---
 
 # Dinohopp — WebGL build & deploy
+
+## Live URLs
+
+- **Repo:** https://github.com/cola500/Dinohopp
+- **Spel (GitHub Pages):** https://cola500.github.io/Dinohopp/
+- **Branches:**
+  - `main` — Unity source (Assets/, Packages/, ProjectSettings/, docs)
+  - `gh-pages` — bara WebGL-byggets innehåll + `.nojekyll`
+
+Första deploy gjordes 2026-05-18. Pages tar 1–2 min att gå live efter push.
 
 ## Snabbstart
 
@@ -79,16 +90,52 @@ ipconfig getifaddr en0    # din Macs lokala IP, t.ex. 192.168.1.42
 
 Om mobilen inte når servern: kontrollera firewall (Mac → Settings → Network → Firewall).
 
-## Publicera till GitHub Pages
+## Ny deploy efter ändringar
 
-Snabbaste vägen:
-1. Initiera git i projektroten (om inte redan gjort): `git init && git branch -M main`
-2. Skapa repo på GitHub.
-3. Kopiera **innehållet** i `Builds/WebGL/` till en ny branch (`gh-pages`) eller till mappen `/docs` på `main`.
-4. På GitHub: Settings → Pages → välj branch `gh-pages` (eller `/docs` på `main`) → save.
-5. URL blir typ `https://<user>.github.io/<repo>/`.
+Repo är redan satt upp. För varje ny deploy:
 
-**Viktigt:** GitHub Pages serverar statiskt utan special-headers. Med `compressionFormat = Disabled` (vår default) funkar det direkt. Om du senare byter till Gzip behöver du antingen `.htaccess`-style headers (inte tillgängligt på Pages) eller stanna kvar på Disabled.
+### 1. Bygg om i Unity
+Meny `Tools → Dinohopp → Build WebGL` — output i `Builds/WebGL/`.
+
+### 2. Pusha source-ändringar till `main` (valfritt men rekommenderat)
+```bash
+cd /Users/johanlindengard/Development/Dinohopp/Dinohopp
+git add Assets/ Packages/ ProjectSettings/ *.md
+git commit -m "<beskrivning av ändringen>"
+git push origin main
+```
+
+### 3. Pusha ny WebGL-build till `gh-pages`
+Använder en temporär git worktree så `main` aldrig får build-artefakter:
+
+```bash
+cd /Users/johanlindengard/Development/Dinohopp/Dinohopp
+
+# 1) Skapa eller återanvänd worktree för gh-pages
+WORKTREE=/tmp/dinohopp-gh-pages
+rm -rf "$WORKTREE"
+git worktree add "$WORKTREE" gh-pages
+
+# 2) Töm gamla filer + kopiera in ny build (utan .DS_Store)
+rm -rf "$WORKTREE"/Build "$WORKTREE"/TemplateData "$WORKTREE"/index.html
+rsync -a --exclude '.DS_Store' Builds/WebGL/ "$WORKTREE"/
+touch "$WORKTREE/.nojekyll"
+
+# 3) Commit + push
+cd "$WORKTREE"
+git add .
+git commit -m "Deploy WebGL build $(date +%Y-%m-%d)"
+git push origin gh-pages
+cd -
+
+# 4) Städa upp
+git worktree remove "$WORKTREE" --force
+```
+
+### 4. Vänta + verifiera
+Pages tar 1–2 min att republikera. Öppna https://cola500.github.io/Dinohopp/ och hård-reload (`Cmd+Shift+R`) så cachen inte serverar den gamla builden.
+
+**Viktigt:** GitHub Pages serverar statiskt utan special-headers. Med `compressionFormat = Disabled` (vår default i `DinohoppBuildSettings.cs`) funkar det direkt. Om du senare byter till Gzip behöver du en host som sätter `Content-Encoding: gzip` — Pages kan, men inte garanterat. Stanna på Disabled tills du behöver minska filstorleken.
 
 ## Publicera till itch.io
 
