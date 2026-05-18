@@ -6,7 +6,9 @@
   <meta name="theme-color" content="#0e1929">
   <meta name="mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-title" content="Dinohopp">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <link rel="manifest" href="manifest.json">
   <title>Dinohopp</title>
   <style>
     *, *::before, *::after { box-sizing: border-box; }
@@ -76,6 +78,47 @@
     }
     #fullscreen-btn:hover, #fullscreen-btn:focus { opacity: 1; }
     body.show-portrait #fullscreen-btn { display: none; }
+    /* Once user pressed "Maximera", shrink the button so it doesn't keep stealing
+       attention (iOS real fullscreen rarely fires, so this is the visible signal
+       that the action did *something*). */
+    body.maximized #fullscreen-btn {
+      opacity: 0.25;
+      transform: scale(0.75);
+      transform-origin: top right;
+    }
+
+    /* iOS-only hint banner — "Add to Home Screen" tip, dismissible.
+       Shown only via JS on iOS that isn't already in standalone mode. */
+    #ios-hint {
+      position: fixed;
+      top: max(8px, env(safe-area-inset-top));
+      left: 50%;
+      transform: translateX(-50%);
+      z-index: 60;
+      background: rgba(0, 0, 0, 0.72);
+      color: #fff;
+      padding: 10px 12px 10px 14px;
+      border-radius: 10px;
+      font-size: 13px;
+      font-weight: 500;
+      line-height: 1.35;
+      display: none;
+      align-items: center;
+      gap: 10px;
+      max-width: min(92vw, 480px);
+    }
+    #ios-hint.visible { display: flex; }
+    #ios-hint .dismiss {
+      background: transparent;
+      color: #fff;
+      border: 0;
+      font-size: 18px;
+      cursor: pointer;
+      padding: 0 4px;
+      opacity: 0.8;
+    }
+    #ios-hint .dismiss:hover { opacity: 1; }
+    body.show-portrait #ios-hint { display: none; } /* don't overlap with portrait overlay */
 
     /* Simple loading text shown while Unity warms up */
     #loading {
@@ -98,7 +141,12 @@
     <div class="text">Vänd telefonen liggande<br>för att spela Dinohopp</div>
   </div>
 
-  <button id="fullscreen-btn" type="button" aria-label="Fullskärm">⛶ Fullskärm</button>
+  <button id="fullscreen-btn" type="button" aria-label="Maximera spelvy">⛶ Maximera</button>
+
+  <div id="ios-hint" role="status">
+    <span>📱 På iPhone: <strong>Dela ⃫</strong> → <strong>"Lägg till på hemskärmen"</strong> för störst spelvy.</span>
+    <button class="dismiss" type="button" aria-label="Stäng tips">✕</button>
+  </div>
   <div id="loading"><span class="label">Laddar Dinohopp…</span></div>
 
   <script>
@@ -149,19 +197,65 @@
       setTimeout(onResize, 100);
     });
 
+    function isIOS() {
+      return /iPad|iPhone|iPod/.test(navigator.userAgent)
+        || (navigator.platform === 'MacIntel' && (navigator.maxTouchPoints || 0) > 1);
+    }
+    function isStandalone() {
+      return (window.navigator.standalone === true)
+        || window.matchMedia('(display-mode: standalone)').matches
+        || window.matchMedia('(display-mode: fullscreen)').matches;
+    }
+
+    function enterMaximizedMode() {
+      body.classList.add('maximized');
+      window.scrollTo(0, 0);
+      // Reflow after potential URL-bar collapse / class change.
+      setTimeout(onResize, 50);
+    }
+
+    // "Maximera" — try real fullscreen first (Android Chrome works, iOS often refuses),
+    // then activate the in-page maximized fallback regardless. Canvas already fills
+    // the viewport via fitCanvas(), so this just polishes the visible state.
     fullscreenBtn.addEventListener('click', function () {
       var el = document.documentElement;
       var inFs = document.fullscreenElement || document.webkitFullscreenElement;
       if (inFs) {
         (document.exitFullscreen || document.webkitExitFullscreen).call(document);
-      } else if (el.requestFullscreen) {
-        el.requestFullscreen().catch(function () { /* iOS Safari often rejects — fine */ });
-      } else if (el.webkitRequestFullscreen) {
-        el.webkitRequestFullscreen();
+        body.classList.remove('maximized');
+        return;
       }
-      // iOS Safari may ignore requestFullscreen entirely; the canvas still fills
-      // the viewport thanks to fitCanvas(), so play remains possible.
+      try {
+        if (el.requestFullscreen) {
+          var p = el.requestFullscreen();
+          if (p && p.catch) p.catch(function () { /* silently fall through */ });
+        } else if (el.webkitRequestFullscreen) {
+          el.webkitRequestFullscreen();
+        }
+      } catch (e) { /* no-op */ }
+      enterMaximizedMode();
     });
+
+    // iOS "Add to Home Screen" hint — show once, dismissible, persists via localStorage.
+    var iosHint = document.getElementById('ios-hint');
+    var iosDismiss = iosHint && iosHint.querySelector('.dismiss');
+    var HINT_KEY = 'dinohopp-ios-hint-dismissed';
+    function maybeShowIosHint() {
+      if (!iosHint) return;
+      if (!isIOS()) return;
+      if (isStandalone()) return;  // already added to home screen
+      try {
+        if (localStorage.getItem(HINT_KEY) === '1') return;
+      } catch (e) { /* private mode → ignore */ }
+      iosHint.classList.add('visible');
+    }
+    if (iosDismiss) {
+      iosDismiss.addEventListener('click', function () {
+        iosHint.classList.remove('visible');
+        try { localStorage.setItem(HINT_KEY, '1'); } catch (e) { /* ignore */ }
+      });
+    }
+    maybeShowIosHint();
 
     // Initial sizing + orientation before Unity loads
     onResize();

@@ -1,0 +1,12 @@
+{
+  "name": "Dinohopp",
+  "short_name": "Dinohopp",
+  "description": "Liten dinosaurie hoppar på svampar och samlar bokstäverna i VIOLA.",
+  "lang": "sv",
+  "start_url": "./",
+  "scope": "./",
+  "display": "fullscreen",
+  "orientation": "landscape",
+  "background_color": "#0e1929",
+  "theme_color": "#0e1929"
+}
