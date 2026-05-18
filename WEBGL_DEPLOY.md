@@ -43,6 +43,26 @@ Vad templaten gör:
 
 Templaten är aktiv via `PlayerSettings.WebGL.template = "PROJECT:DinohoppMobile"` som sätts av `Tools → Dinohopp → Configure WebGL Build`.
 
+### Maximera vy + iOS "Add to Home Screen"
+
+Riktig fullscreen via `Element.requestFullscreen()` är **blockerad på iOS Safari/Chrome** (Apple-policy för canvas/div). Vår mobile UX hanterar detta:
+
+1. **"⛶ Maximera"-knappen** (top-right):
+   - Försöker `requestFullscreen()` först (funkar på Android Chrome, desktop).
+   - Faller alltid tillbaka till `body.maximized`-CSS-läge: scrollar viewporten till top, krymper knappen till 75% opacity 0.25 så den inte stör, och kör om `fitCanvas()`. Canvas fyller redan viewporten via 16:9-fit, så maximize-läget är mest en visuell bekräftelse + nedtoning av UI.
+
+2. **iOS-tipsbanner** (visas en gång på iOS):
+   - Text: *"📱 På iPhone: Dela ⃫ → 'Lägg till på hemskärmen' för störst spelvy."*
+   - Dismiss-knapp (✕) → state sparas i `localStorage` så det inte kommer tillbaka.
+   - Visas INTE när enheten redan är i standalone-mode (= redan tillagd på hemskärmen).
+   - Visas INTE när portrait-overlay täcker skärmen (för att inte stapla UI).
+
+3. **PWA-manifest** (`manifest.json`):
+   - `display: fullscreen`, `orientation: landscape`, theme/background `#0e1929`.
+   - Tillsammans med `apple-mobile-web-app-capable=yes` + `apple-mobile-web-app-status-bar-style=black-translucent` ger iOS-användaren en **riktig fullscreen-upplevelse** när spelet är tillagt på hemskärmen och startas därifrån.
+   - Detta är "best mobile experience" på iPhone.
+   - Note: vi har inga PWA-ikoner än → iOS använder screenshot för hemskärmsikonen. Lägg till `apple-touch-icon` i framtida slice för polerad ikon.
+
 ## Snabbstart
 
 1. **I Unity Editor:** kör menyn `Tools → Dinohopp → Configure WebGL Build` **EN GÅNG**. Den växlar build-target till WebGL och sätter sane defaults.
@@ -190,8 +210,9 @@ itch.io hanterar Gzip automatiskt om du senare väljer komprimering.
 | **Touchscreen.current saknas på desktop** | `wasPressedThisFrame` returnerar false | OK — Mouse + Keyboard tar över på desktop. Vår input-pipeline täcker båda. |
 | **Pinch-zoom triggar skala** | Mobilen zoomar in på spelet | Unity:s default WebGL-template har en `<meta viewport>` som blockar det. Om problem: anpassa templaten. |
 | **Liggande orientering** | Vissa mobiler startar i portrait | DinohoppMobile-templaten visar "Vänd telefonen"-overlay i portrait, försvinner i landscape. |
-| **iOS Safari fullskärm** | `requestFullscreen()` ignoreras ofta på iOS Safari | OK — canvas fyller ändå viewporten via `100dvh` + dynamisk fit. Fullskärm är "nice to have", inte krav. |
+| **iOS Safari fullskärm** | `requestFullscreen()` ignoreras alltid på iOS Safari/Chrome (Apple-policy för canvas/div) | **Förväntat beteende** — "⛶ Maximera"-knappen aktiverar `body.maximized`-fallback istället: scrollar till top, krymper knappen, canvas fyller redan viewporten via `fitCanvas()`. För riktig fullskärm på iOS: tipsbanner uppe på skärmen rekommenderar **"Lägg till på hemskärmen"** via manifest+apple-meta-taggar. |
 | **iOS Safari URL-bar** | URL-bar tar pixlar tills första scroll | `100dvh` lägger canvas över hela visible-viewporten. När user trycker överst skickas URL-baren bort automatiskt vid första `requestFullscreen`-anrop på Android. |
+| **iOS Chrome** | Använder WebKit pga Apple-policy, samma fullscreen-begränsning som Safari | Samma fallback gäller. |
 | **Build-storlek 25–35 MB** | Långsam första laddning på 4G | OK för delning + WiFi-test. Senare: aktivera Gzip-komprimering (kräver host som sätter `Content-Encoding`). |
 | **Cache** | Gammal build cachas | Hård reload (Cmd+Shift+R) eller bump version-string. |
 
