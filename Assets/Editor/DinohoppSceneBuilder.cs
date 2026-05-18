@@ -14,6 +14,43 @@ public static class DinohoppSceneBuilder
     // Shared sky color — also used as the "hollow" inside Letter O so the ring reads.
     static readonly Color SkyColor = new Color(0.62f, 0.82f, 0.93f, 1f);
 
+    [MenuItem("Tools/Dinohopp/Log Alignment")]
+    public static void LogAlignment()
+    {
+        var dino = GameObject.FindWithTag("Player");
+        if (dino != null)
+        {
+            var col = dino.GetComponent<BoxCollider2D>();
+            var foot = dino.transform.Find("Visual/SurfaceCurve/Foot_Left");
+            float footBottom = foot != null
+                ? foot.position.y - foot.localScale.y * 0.5f
+                : float.NaN;
+            Debug.Log($"[Alignment] Dino  collider y: [{col.bounds.min.y:F3} .. {col.bounds.max.y:F3}]  |  feet bottom y: {footBottom:F3}");
+        }
+
+        var mushrooms = Object.FindObjectsByType<MushroomBounceFeedback>(FindObjectsInactive.Exclude);
+        foreach (var m in mushrooms)
+        {
+            var col = m.GetComponent<BoxCollider2D>();
+            var cap = m.transform.Find("Visual/Cap");
+            float capTop = cap != null
+                ? cap.position.y + cap.localScale.y * 0.5f
+                : float.NaN;
+            Debug.Log($"[Alignment] {m.gameObject.name}  collider top y: {col.bounds.max.y:F3}  |  cap top y: {capTop:F3}");
+        }
+
+        var goal = Object.FindAnyObjectByType<Goal>();
+        if (goal != null)
+        {
+            var col = goal.GetComponent<BoxCollider2D>();
+            var flag = goal.transform.Find("Visual/Flag");
+            string flagInfo = flag != null
+                ? $"x: [{flag.position.x - flag.localScale.x * 0.5f:F3} .. {flag.position.x + flag.localScale.x * 0.5f:F3}]"
+                : "(no flag visual found)";
+            Debug.Log($"[Alignment] Goal  trigger x: [{col.bounds.min.x:F3} .. {col.bounds.max.x:F3}]  |  flag visual {flagInfo}");
+        }
+    }
+
     [MenuItem("Tools/Dinohopp/Build Prototype Scene")]
     public static void Build()
     {
@@ -466,8 +503,22 @@ public static class DinohoppSceneBuilder
         loco.runBobAmount = 0.04f;
 
         // ---- Visual hierarchy ----
+        // Two nested transforms so DinoLocomotion (bob + breath on Visual) and
+        // DinoSurfaceVisualOffset (mushroom-cap parabola on SurfaceCurve) compose
+        // without fighting over the same property:
+        //   root.scale    ← squash/stretch/joy (DinoFeedback)
+        //   Visual        ← idle breathing + running footstep bob (DinoLocomotion)
+        //   SurfaceCurve  ← parabolic lift on mushrooms (DinoSurfaceVisualOffset)
+        //   body parts    ← children of SurfaceCurve
         var visual = new GameObject("Visual");
         visual.transform.SetParent(root.transform, worldPositionStays: false);
+        // Drop the whole rig 0.25 down so the feet sprites' bottom edge matches
+        // the collider bottom (-0.715). Without this offset the feet hover 0.25
+        // units above every surface and dino looks like it's walking on air.
+        visual.transform.localPosition = new Vector3(0f, -0.25f, 0f);
+
+        var surfaceCurve = new GameObject("SurfaceCurve");
+        surfaceCurve.transform.SetParent(visual.transform, worldPositionStays: false);
 
         var bodyColor = new Color(0.95f, 0.55f, 0.15f); // bright orange
         var darkBody  = new Color(0.75f, 0.40f, 0.10f); // shadowed orange for feet
@@ -475,40 +526,40 @@ public static class DinohoppSceneBuilder
         var eyePupil  = new Color(0.10f, 0.10f, 0.20f); // near-black, slight blue tint
 
         // Tail — slim rect, pointed up-back. Sorted behind body so it tucks in.
-        SpawnChild(visual.transform, "Tail", square, bodyColor,
+        SpawnChild(surfaceCurve.transform, "Tail", square, bodyColor,
                    localPos:   new Vector3(-0.35f, 0.00f, 0f),
                    localScale: new Vector3(0.32f, 0.12f, 1f),
                    sortingOrder: 1,
                    rotationZ: 20f);
 
         // Body — wide round blob.
-        SpawnChild(visual.transform, "Body", circle, bodyColor,
+        SpawnChild(surfaceCurve.transform, "Body", circle, bodyColor,
                    localPos:   new Vector3(0.00f, -0.05f, 0f),
                    localScale: new Vector3(0.78f, 0.70f, 1f),
                    sortingOrder: 2);
 
         // Two stubby feet, slightly darker for a hint of shading.
-        SpawnChild(visual.transform, "Foot_Left", square, darkBody,
+        SpawnChild(surfaceCurve.transform, "Foot_Left", square, darkBody,
                    localPos:   new Vector3(-0.07f, -0.40f, 0f),
                    localScale: new Vector3(0.20f, 0.13f, 1f),
                    sortingOrder: 3);
-        SpawnChild(visual.transform, "Foot_Right", square, darkBody,
+        SpawnChild(surfaceCurve.transform, "Foot_Right", square, darkBody,
                    localPos:   new Vector3(0.20f, -0.40f, 0f),
                    localScale: new Vector3(0.20f, 0.13f, 1f),
                    sortingOrder: 3);
 
         // Head — large round head front-and-up of the body.
-        SpawnChild(visual.transform, "Head", circle, bodyColor,
+        SpawnChild(surfaceCurve.transform, "Head", circle, bodyColor,
                    localPos:   new Vector3(0.28f, 0.22f, 0f),
                    localScale: new Vector3(0.48f, 0.48f, 1f),
                    sortingOrder: 4);
 
         // Big friendly eye — white sclera + dark pupil offset slightly forward.
-        SpawnChild(visual.transform, "Eye_White", circle, eyeWhite,
+        SpawnChild(surfaceCurve.transform, "Eye_White", circle, eyeWhite,
                    localPos:   new Vector3(0.36f, 0.28f, 0f),
                    localScale: new Vector3(0.18f, 0.18f, 1f),
                    sortingOrder: 5);
-        SpawnChild(visual.transform, "Eye_Pupil", circle, eyePupil,
+        SpawnChild(surfaceCurve.transform, "Eye_Pupil", circle, eyePupil,
                    localPos:   new Vector3(0.40f, 0.27f, 0f),
                    localScale: new Vector3(0.09f, 0.09f, 1f),
                    sortingOrder: 6);
@@ -520,6 +571,14 @@ public static class DinohoppSceneBuilder
         blink.blinkDuration = 0.10f;
         blink.closedScaleY = 0.10f;
 
+        // Visual sink along the mushroom cap's oval edge — pure cosmetic.
+        // Collider top equals the cap's PEAK so centre offset is 0; feet sink
+        // toward the cap edges where the oval drops away.
+        var surfaceOffset = root.AddComponent<DinoSurfaceVisualOffset>();
+        surfaceOffset.surfaceCurve = surfaceCurve.transform;
+        surfaceOffset.curveHeight = 0.20f;
+        surfaceOffset.smoothSpeed = 10f;
+
         return root;
     }
 
@@ -530,8 +589,11 @@ public static class DinohoppSceneBuilder
         root.transform.localScale = Vector3.one;
 
         var col = root.AddComponent<BoxCollider2D>();
-        col.size = new Vector2(2.0f, 5.0f);
-        col.offset = new Vector2(0f, 0.5f);
+        // Trigger centred on the flag visual (offset.x = 0.45 = flag local x).
+        // Width 1.0 covers flag + a tiny lead-in so success fires when dino's
+        // right edge actually touches the pole, not 1.5 units earlier.
+        col.size = new Vector2(1.0f, 5.0f);
+        col.offset = new Vector2(0.45f, 0.5f);
         col.isTrigger = true;
 
         root.AddComponent<Goal>();

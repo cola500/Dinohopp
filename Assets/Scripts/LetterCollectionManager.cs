@@ -161,8 +161,7 @@ public class LetterCollectionManager : MonoBehaviour
         popTimer = 0f;
         if (wordText != null) wordText.transform.localScale = wordTextBaseScale;
 
-        var all = FindObjectsByType<LetterCollectible>(
-            FindObjectsInactive.Include, FindObjectsSortMode.None);
+        var all = FindObjectsByType<LetterCollectible>(FindObjectsInactive.Include);
         for (int i = 0; i < all.Length; i++) all[i].ResetState();
     }
 }

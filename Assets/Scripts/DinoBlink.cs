@@ -6,9 +6,9 @@ using UnityEngine;
 /// </summary>
 public class DinoBlink : MonoBehaviour
 {
-    [Tooltip("Eye_White transform. Auto-resolved to 'Visual/Eye_White' if left null.")]
+    [Tooltip("Eye_White transform. Auto-resolved to 'Visual/SurfaceCurve/Eye_White' if left null.")]
     public Transform eyeWhite;
-    [Tooltip("Eye_Pupil transform. Auto-resolved to 'Visual/Eye_Pupil' if left null.")]
+    [Tooltip("Eye_Pupil transform. Auto-resolved to 'Visual/SurfaceCurve/Eye_Pupil' if left null.")]
     public Transform eyePupil;
 
     [Header("Timing")]
@@ -38,8 +38,8 @@ public class DinoBlink : MonoBehaviour
 
     void Awake()
     {
-        if (eyeWhite == null) eyeWhite = transform.Find("Visual/Eye_White");
-        if (eyePupil == null) eyePupil = transform.Find("Visual/Eye_Pupil");
+        if (eyeWhite == null) eyeWhite = transform.Find("Visual/SurfaceCurve/Eye_White");
+        if (eyePupil == null) eyePupil = transform.Find("Visual/SurfaceCurve/Eye_Pupil");
         if (eyeWhite != null) baseScaleWhite = eyeWhite.localScale;
         if (eyePupil != null)
         {

@@ -41,6 +41,9 @@ public class DinoController : MonoBehaviour
     /// <summary>True when the ground-check found a non-self collider this frame.</summary>
     public bool IsGrounded => isGrounded;
 
+    /// <summary>The non-self collider the ground-check is currently overlapping (null if airborne).</summary>
+    public Collider2D CurrentGroundCollider { get; private set; }
+
     Rigidbody2D rb;
     Collider2D col;
     bool isGrounded;
@@ -134,8 +137,10 @@ public class DinoController : MonoBehaviour
             // Ignore the dino's own colliders.
             if (h.attachedRigidbody == rb) continue;
             if (h == col) continue;
+            CurrentGroundCollider = h;
             return true;
         }
+        CurrentGroundCollider = null;
         return false;
     }
 
