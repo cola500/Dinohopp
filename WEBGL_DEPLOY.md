@@ -6,9 +6,11 @@ status: active
 last_updated: 2026-05-18
 sections:
   - Live URLs
+  - Mobile WebGL template
   - Snabbstart
   - Bygga lokalt
   - Testa lokalt (Mac)
+  - Testa på riktig mobil
   - Ny deploy efter ändringar
   - Publicera till itch.io
   - Mobilbrowser-risker
@@ -25,6 +27,21 @@ sections:
   - `gh-pages` — bara WebGL-byggets innehåll + `.nojekyll`
 
 Första deploy gjordes 2026-05-18. Pages tar 1–2 min att gå live efter push.
+
+## Mobile WebGL template
+
+Egen WebGL-template: **`Assets/WebGLTemplates/DinohoppMobile/index.html`**.
+
+Vad templaten gör:
+- **16:9 letterbox-fit** — canvas storleksanpassas dynamiskt via JS (`fitCanvas()`) så det fyller viewporten utan att förvränga aspect ratio. Svarta band uppe/nere eller på sidorna vid behov.
+- **Lyssnar på `resize` + `orientationchange`** — re-fittar när telefonen vrids eller browsern ändrar storlek.
+- **Portrait-overlay** — visar "Vänd telefonen liggande" om enheten är touch + portrait. Försvinner automatiskt vid rotation till landscape.
+- **Fullskärm-knapp** (top-right) — anropar `requestFullscreen` med webkit-fallback. På iOS Safari ignoreras anropet ibland, men canvas fyller redan viewporten via `100dvh` + `fitCanvas()` så spelet är fullt spelbart utan fullskärm.
+- **Dynamic viewport units** (`100dvh`) — undviker att mobile browser-chrome (URL-bar) stjäl pixlar.
+- **Safe-area** — fullskärm-knappen respekterar notch/dynamic-island via `env(safe-area-inset-*)`.
+- **`touch-action: none`** + `viewport-fit=cover` — blockerar pinch-zoom och pull-to-refresh.
+
+Templaten är aktiv via `PlayerSettings.WebGL.template = "PROJECT:DinohoppMobile"` som sätts av `Tools → Dinohopp → Configure WebGL Build`.
 
 ## Snabbstart
 
@@ -89,6 +106,19 @@ ipconfig getifaddr en0    # din Macs lokala IP, t.ex. 192.168.1.42
 Öppna `http://192.168.1.42:8000` i mobilbrowsern.
 
 Om mobilen inte når servern: kontrollera firewall (Mac → Settings → Network → Firewall).
+
+## Testa på riktig mobil
+
+Checklista efter `Build WebGL` + `python3 -m http.server 8000`:
+
+1. **Öppna URL:n i mobil-browsern** (Safari på iOS, Chrome på Android).
+2. **Håll mobilen i portrait** → ska visa stor "Vänd telefonen liggande"-overlay med ↩️-ikon.
+3. **Vrid till landscape** → overlay försvinner, dinon syns mitt på skärmen.
+4. **Canvas ska fylla skärmen i 16:9** — svarta band ovanpå/under eller på sidorna vid behov. Inga pinch-zoom-glapp. Inga URL-bar-glapp.
+5. **Tryck "⛶ Fullskärm"** (top-right) — på Android Chrome ska browsern gå i fullskärm. På iOS Safari ignoreras anropet ofta, men spelet ska ändå fylla viewporten.
+6. **Tryck på skärmen** → starta spelet. Tryck igen för att hoppa. Bokstavscollect, fall, mål — allt ska fungera.
+7. **Ljud:** första tap aktiverar AudioContext (iOS Safari-kravet). Hopp/landning/svampbounce ska höras.
+8. **Vrid till portrait mitt i spelet** → overlay återkommer. Vrid tillbaka → spelet fortsätter.
 
 ## Ny deploy efter ändringar
 
@@ -159,7 +189,9 @@ itch.io hanterar Gzip automatiskt om du senare väljer komprimering.
 | **WebGL stänger av sig** | Mobil sätter tab i bakgrund → context lost | Spelaren returnerar och får svart skärm. Ladda om sidan. |
 | **Touchscreen.current saknas på desktop** | `wasPressedThisFrame` returnerar false | OK — Mouse + Keyboard tar över på desktop. Vår input-pipeline täcker båda. |
 | **Pinch-zoom triggar skala** | Mobilen zoomar in på spelet | Unity:s default WebGL-template har en `<meta viewport>` som blockar det. Om problem: anpassa templaten. |
-| **Liggande orientering** | Vissa mobiler startar i portrait | Spel är designat för landscape. Spelaren får vrida. Kan vid behov lägga till orientation-hint i templaten. |
+| **Liggande orientering** | Vissa mobiler startar i portrait | DinohoppMobile-templaten visar "Vänd telefonen"-overlay i portrait, försvinner i landscape. |
+| **iOS Safari fullskärm** | `requestFullscreen()` ignoreras ofta på iOS Safari | OK — canvas fyller ändå viewporten via `100dvh` + dynamisk fit. Fullskärm är "nice to have", inte krav. |
+| **iOS Safari URL-bar** | URL-bar tar pixlar tills första scroll | `100dvh` lägger canvas över hela visible-viewporten. När user trycker överst skickas URL-baren bort automatiskt vid första `requestFullscreen`-anrop på Android. |
 | **Build-storlek 25–35 MB** | Långsam första laddning på 4G | OK för delning + WiFi-test. Senare: aktivera Gzip-komprimering (kräver host som sätter `Content-Encoding`). |
 | **Cache** | Gammal build cachas | Hård reload (Cmd+Shift+R) eller bump version-string. |
 

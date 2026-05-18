@@ -33,7 +33,7 @@ public static class DinohoppBuildSettings
         PlayerSettings.WebGL.dataCaching       = true;
         PlayerSettings.WebGL.exceptionSupport  = WebGLExceptionSupport.None; // smallest build
         PlayerSettings.WebGL.linkerTarget      = WebGLLinkerTarget.Wasm;
-        PlayerSettings.WebGL.template          = "APPLICATION:Default";
+        PlayerSettings.WebGL.template          = "PROJECT:DinohoppMobile";
         PlayerSettings.WebGL.threadsSupport    = false; // best browser compatibility
 
         // Audio: standard 2D-game-friendly defaults; nothing exotic needed.
