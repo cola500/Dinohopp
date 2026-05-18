@@ -87,42 +87,23 @@ public static class DinohoppSceneBuilder
         var camera = BuildCamera();
         BuildSky(square, circle);
 
-        // Level 1 — two ground segments separated by a gap, decorative mushrooms at
-        // running height (dino passes underneath), one bridge mushroom in the gap.
-        BuildGround("Ground_A", new Vector3(4f,  -3.5f, 0f), new Vector3(24f, 1.5f, 1f), square);
-        BuildGround("Ground_B", new Vector3(29f, -3.5f, 0f), new Vector3(16f, 1.5f, 1f), square);
-        // Visual-only polish (grass cap + dirt shadow + clumps/flowers/pebbles).
-        // Lives on separate roots so colliders are untouched.
-        BuildGroundDecor("Ground_A", new Vector3(4f,  -3.5f, 0f), new Vector3(24f, 1.5f, 1f), square, circle, seed: 401);
-        BuildGroundDecor("Ground_B", new Vector3(29f, -3.5f, 0f), new Vector3(16f, 1.5f, 1f), square, circle, seed: 402);
-
-        // Each mushroom gets its own voice clip. Pitch held at 1.0 across the board
-        // so each voice plays at its natural frequency — pitch-shifting was hiding
-        // the personality differences (everything got pushed up the same way).
-        BuildMushroom("Mushroom_1", square, circle, new Vector3(4f,   -0.8f, 0f), voices[0], pitch: 1f, voiceName: "soft_boing");
-        BuildMushroom("Mushroom_2", square, circle, new Vector3(7f,   -0.6f, 0f), voices[1], pitch: 1f, voiceName: "pip");
-        BuildMushroom("Mushroom_3", square, circle, new Vector3(10f,  -0.8f, 0f), voices[2], pitch: 1f, voiceName: "plop_bubble");
-        BuildMushroom("Mushroom_4", square, circle, new Vector3(17.5f,-1.5f, 0f), voices[3], pitch: 1f, voiceName: "big_boing");   // BRIDGE
-        BuildMushroom("Mushroom_5", square, circle, new Vector3(26f,  -0.8f, 0f), voices[4], pitch: 1f, voiceName: "ding");
-        BuildMushroom("Mushroom_6", square, circle, new Vector3(30f,  -0.6f, 0f), voices[5], pitch: 1f, voiceName: "happy_pop");
-
         var dino = BuildDino(square, circle, jumpClip, landClip);
-        BuildGoal(square, circle, new Vector3(34f, -1.0f, 0f));
-
-        // V-I-O-L-A collectibles — each letter gets its identity color from the
-        // shared palette in LetterCollectionManager so the in-world pickup matches
-        // the UI row exactly. Heights mostly catchable at running height; L sits
-        // above the bridge so it's collected naturally during the bridge-jump.
-        var palette = LetterCollectionManager.DefaultLetterColors;
-        BuildLetter(square, circle, "V", new Vector3( 2f,   -1.5f, 0f), letterCollectClip, palette[0]);
-        BuildLetter(square, circle, "I", new Vector3( 5f,   -1.2f, 0f), letterCollectClip, palette[1]);
-        BuildLetter(square, circle, "O", new Vector3(10f,   -0.7f, 0f), letterCollectClip, palette[2]);
-        BuildLetter(square, circle, "L", new Vector3(17.5f, -0.4f, 0f), letterCollectClip, palette[3]);
-        BuildLetter(square, circle, "A", new Vector3(29f,   -1.5f, 0f), letterCollectClip, palette[4]);
-
         var ui = BuildUI();
-        BuildGameManager(dino, camera, ui, fallClip);
+        var gm = BuildGameManager(dino, camera, ui, fallClip);
         BuildLetterCollectionManager(ui, allLettersClip);
+
+        // Both levels live in the scene as separate root GameObjects.
+        // Level 1 starts active; Level 2 is built inactive. GameManager toggles
+        // them on Success and reads each level's LevelInfo to apply its sky color,
+        // dino start position, target word, and letter palette.
+        var level1 = BuildLevel1(square, circle, voices, bounceClip, letterCollectClip);
+        var level2 = BuildLevel2(square, circle, voices, bounceClip, letterCollectClip);
+        level2.SetActive(false);
+
+        gm.levels = new[] {
+            level1.GetComponent<LevelInfo>(),
+            level2.GetComponent<LevelInfo>(),
+        };
 
         EnsureSceneInBuildSettings();
         EditorSceneManager.SaveScene(scene, ScenePath);
@@ -226,13 +207,14 @@ public static class DinohoppSceneBuilder
         }
     }
 
-    static void BuildGround(string name, Vector3 position, Vector3 scale, Sprite sprite)
+    static void BuildGround(string name, Vector3 position, Vector3 scale, Sprite sprite, Transform parent = null)
     {
         // Dirt-brown base. The grass cap + decor live on a separate decor root so
         // gameplay collider is untouched.
         var dirtMain = new Color(0.50f, 0.32f, 0.20f, 1f);
         var go = MakeSprite(name, sprite, dirtMain, position, scale, sortingOrder: 0);
         go.AddComponent<BoxCollider2D>();
+        if (parent != null) go.transform.SetParent(parent, worldPositionStays: true);
     }
 
     /// <summary>
@@ -243,7 +225,7 @@ public static class DinohoppSceneBuilder
     ///   - small grass tufts, flowers, and pebbles distributed deterministically
     /// </summary>
     static void BuildGroundDecor(string groundName, Vector3 groundPos, Vector3 groundScale,
-                                 Sprite square, Sprite circle, int seed)
+                                 Sprite square, Sprite circle, int seed, Transform parent = null)
     {
         float halfW = groundScale.x * 0.5f;
         float halfH = groundScale.y * 0.5f;
@@ -255,6 +237,7 @@ public static class DinohoppSceneBuilder
         var root = new GameObject(groundName + "_Decor");
         root.transform.position = Vector3.zero;
         root.transform.localScale = Vector3.one;
+        if (parent != null) root.transform.SetParent(parent, worldPositionStays: true);
 
         // ---- Big bands ----
         // Grass cap — bright green, slight overhang above the ground top.
@@ -362,7 +345,7 @@ public static class DinohoppSceneBuilder
 
     static void BuildMushroom(string name, Sprite square, Sprite circle,
                               Vector3 position, AudioClip bounceClip,
-                              float pitch = 1f, string voiceName = "")
+                              float pitch = 1f, string voiceName = "", Transform parent = null)
     {
         // Append voice name to hierarchy label so the Inspector reads "Mushroom_1 (soft_boing)".
         string fullName = string.IsNullOrEmpty(voiceName) ? name : $"{name} ({voiceName})";
@@ -371,6 +354,7 @@ public static class DinohoppSceneBuilder
         var root = new GameObject(fullName);
         root.transform.position = position;
         root.transform.localScale = Vector3.one;
+        if (parent != null) root.transform.SetParent(parent, worldPositionStays: true);
 
         // One-way platform collider: slightly wider than the visual cap (2.0 vs 1.8)
         // for forgiving landings, slightly thinner (0.5 vs 0.6) so the side-overlap
@@ -582,11 +566,12 @@ public static class DinohoppSceneBuilder
         return root;
     }
 
-    static void BuildGoal(Sprite square, Sprite circle, Vector3 position)
+    static void BuildGoal(Sprite square, Sprite circle, Vector3 position, Transform parent = null)
     {
         var root = new GameObject("Goal");
         root.transform.position = position;
         root.transform.localScale = Vector3.one;
+        if (parent != null) root.transform.SetParent(parent, worldPositionStays: true);
 
         var col = root.AddComponent<BoxCollider2D>();
         // Trigger centred on the flag visual (offset.x = 0.45 = flag local x).
@@ -624,7 +609,105 @@ public static class DinohoppSceneBuilder
                    sortingOrder: 7);
     }
 
-    static void BuildGameManager(GameObject dino, GameObject camera, UIRefs ui, AudioClip fallClip)
+    // ---------- Level builders ----------
+
+    static GameObject BuildLevel1(Sprite square, Sprite circle, AudioClip[] voices,
+                                  AudioClip bounceClip, AudioClip letterCollectClip)
+    {
+        var root = new GameObject("Level_1");
+        var info = root.AddComponent<LevelInfo>();
+        info.displayName        = "Level 1 — VIOLA";
+        info.wordToCollect      = "VIOLA";
+        info.letterColors       = LetterCollectionManager.DefaultLetterColors;
+        info.skyColor           = new Color(0.62f, 0.82f, 0.93f, 1f); // pastel daytime
+        info.dinoStartPosition  = new Vector3(0f, 0f, 0f);
+        var t = root.transform;
+
+        BuildGround("Ground_A", new Vector3(4f,  -3.5f, 0f), new Vector3(24f, 1.5f, 1f), square, t);
+        BuildGround("Ground_B", new Vector3(29f, -3.5f, 0f), new Vector3(16f, 1.5f, 1f), square, t);
+        BuildGroundDecor("Ground_A", new Vector3(4f,  -3.5f, 0f), new Vector3(24f, 1.5f, 1f), square, circle, seed: 401, t);
+        BuildGroundDecor("Ground_B", new Vector3(29f, -3.5f, 0f), new Vector3(16f, 1.5f, 1f), square, circle, seed: 402, t);
+
+        BuildMushroom("Mushroom_1", square, circle, new Vector3(4f,    -0.8f, 0f), voices[0], 1f, "soft_boing",  t);
+        BuildMushroom("Mushroom_2", square, circle, new Vector3(7f,    -0.6f, 0f), voices[1], 1f, "pip",         t);
+        BuildMushroom("Mushroom_3", square, circle, new Vector3(10f,   -0.8f, 0f), voices[2], 1f, "plop_bubble", t);
+        BuildMushroom("Mushroom_4", square, circle, new Vector3(17.5f, -1.5f, 0f), voices[3], 1f, "big_boing",   t); // BRIDGE
+        BuildMushroom("Mushroom_5", square, circle, new Vector3(26f,   -0.8f, 0f), voices[4], 1f, "ding",        t);
+        BuildMushroom("Mushroom_6", square, circle, new Vector3(30f,   -0.6f, 0f), voices[5], 1f, "happy_pop",   t);
+
+        BuildGoal(square, circle, new Vector3(34f, -1.0f, 0f), t);
+
+        var palette = LetterCollectionManager.DefaultLetterColors;
+        BuildLetter(square, circle, 0, "V", new Vector3( 2f,    -1.5f, 0f), letterCollectClip, palette[0], t);
+        BuildLetter(square, circle, 1, "I", new Vector3( 5f,    -1.2f, 0f), letterCollectClip, palette[1], t);
+        BuildLetter(square, circle, 2, "O", new Vector3(10f,    -0.7f, 0f), letterCollectClip, palette[2], t);
+        BuildLetter(square, circle, 3, "L", new Vector3(17.5f,  -0.4f, 0f), letterCollectClip, palette[3], t);
+        BuildLetter(square, circle, 4, "A", new Vector3(29f,    -1.5f, 0f), letterCollectClip, palette[4], t);
+
+        return root;
+    }
+
+    static GameObject BuildLevel2(Sprite square, Sprite circle, AudioClip[] voices,
+                                  AudioClip bounceClip, AudioClip letterCollectClip)
+    {
+        var root = new GameObject("Level_2");
+        var info = root.AddComponent<LevelInfo>();
+        info.displayName        = "Level 2 — LINDENGARD";
+        info.wordToCollect      = "LINDENGARD";
+        info.letterColors       = BuildLindengardPalette();
+        info.skyColor           = new Color(0.78f, 0.68f, 0.85f, 1f); // dusty lavender twilight
+        info.dinoStartPosition  = new Vector3(0f, 0f, 0f);
+        var t = root.transform;
+
+        // Three ground segments separated by two gaps.
+        BuildGround("Ground_A2", new Vector3( 2.5f, -3.5f, 0f), new Vector3(15f, 1.5f, 1f), square, t);
+        BuildGround("Ground_B2", new Vector3(18f,   -3.5f, 0f), new Vector3( 8f, 1.5f, 1f), square, t);
+        BuildGround("Ground_C2", new Vector3(33.5f, -3.5f, 0f), new Vector3(13f, 1.5f, 1f), square, t);
+        BuildGroundDecor("Ground_A2", new Vector3( 2.5f, -3.5f, 0f), new Vector3(15f, 1.5f, 1f), square, circle, seed: 501, t);
+        BuildGroundDecor("Ground_B2", new Vector3(18f,   -3.5f, 0f), new Vector3( 8f, 1.5f, 1f), square, circle, seed: 502, t);
+        BuildGroundDecor("Ground_C2", new Vector3(33.5f, -3.5f, 0f), new Vector3(13f, 1.5f, 1f), square, circle, seed: 503, t);
+
+        // Mushrooms — 3 decorative on A, 1 bridge into B, 1 decorative on B,
+        // 1 bridge into C, 2 decorative on C. Voices cycle through the 6-voice pool.
+        BuildMushroom("M2_1", square, circle, new Vector3( 3f,   -0.8f, 0f), voices[0], 1f, "soft_boing",  t);
+        BuildMushroom("M2_2", square, circle, new Vector3( 6f,   -0.6f, 0f), voices[1], 1f, "pip",         t);
+        BuildMushroom("M2_3", square, circle, new Vector3( 9f,   -0.8f, 0f), voices[2], 1f, "plop_bubble", t);
+        BuildMushroom("M2_4", square, circle, new Vector3(12f,   -1.5f, 0f), voices[3], 1f, "big_boing",   t); // BRIDGE 1
+        BuildMushroom("M2_5", square, circle, new Vector3(20f,   -0.7f, 0f), voices[4], 1f, "ding",        t);
+        BuildMushroom("M2_6", square, circle, new Vector3(24.5f, -1.5f, 0f), voices[3], 1f, "big_boing",   t); // BRIDGE 2
+        BuildMushroom("M2_7", square, circle, new Vector3(30f,   -0.6f, 0f), voices[5], 1f, "happy_pop",   t);
+        BuildMushroom("M2_8", square, circle, new Vector3(36f,   -0.8f, 0f), voices[0], 1f, "soft_boing",  t);
+
+        BuildGoal(square, circle, new Vector3(39f, -1.0f, 0f), t);
+
+        // 10 letter pickups — L I N D E N G A R D — distinct positions even where
+        // characters repeat. Heights mostly at running height; D (pos 3) sits on
+        // bridge 1 and A (pos 7) sits on bridge 2 so they're collected naturally.
+        var p = info.letterColors;
+        BuildLetter(square, circle, 0, "L", new Vector3( 2f,    -1.5f, 0f), letterCollectClip, p[0], t);
+        BuildLetter(square, circle, 1, "I", new Vector3( 5f,    -1.2f, 0f), letterCollectClip, p[1], t);
+        BuildLetter(square, circle, 2, "N", new Vector3( 8f,    -1.0f, 0f), letterCollectClip, p[2], t);
+        BuildLetter(square, circle, 3, "D", new Vector3(12f,    -0.4f, 0f), letterCollectClip, p[3], t); // on bridge 1
+        BuildLetter(square, circle, 4, "E", new Vector3(15f,    -1.3f, 0f), letterCollectClip, p[4], t);
+        BuildLetter(square, circle, 5, "N", new Vector3(18f,    -0.8f, 0f), letterCollectClip, p[5], t);
+        BuildLetter(square, circle, 6, "G", new Vector3(21f,    -1.2f, 0f), letterCollectClip, p[6], t);
+        BuildLetter(square, circle, 7, "A", new Vector3(24.5f,  -0.4f, 0f), letterCollectClip, p[7], t); // on bridge 2
+        BuildLetter(square, circle, 8, "R", new Vector3(28f,    -1.5f, 0f), letterCollectClip, p[8], t);
+        BuildLetter(square, circle, 9, "D", new Vector3(35f,    -1.0f, 0f), letterCollectClip, p[9], t);
+
+        return root;
+    }
+
+    /// <summary>10-color palette for LINDENGARD — cycles the 5 VIOLA colors twice.</summary>
+    static Color[] BuildLindengardPalette()
+    {
+        var src = LetterCollectionManager.DefaultLetterColors;
+        var p = new Color[10];
+        for (int i = 0; i < p.Length; i++) p[i] = src[i % src.Length];
+        return p;
+    }
+
+    static GameManager BuildGameManager(GameObject dino, GameObject camera, UIRefs ui, AudioClip fallClip)
     {
         var go = new GameObject("GameManager");
 
@@ -642,6 +725,7 @@ public static class DinohoppSceneBuilder
         gm.fallThresholdY   = -7f;
         gm.fallClip         = fallClip;
         gm.fallVolume       = 0.65f;
+        return gm;
     }
 
     static void BuildLetterCollectionManager(UIRefs ui, AudioClip allLettersClip)
@@ -662,12 +746,13 @@ public static class DinohoppSceneBuilder
 
     // ---------- Letter builders ----------
 
-    static void BuildLetter(Sprite square, Sprite circle, string letter,
-                            Vector3 position, AudioClip collectClip, Color color)
+    static void BuildLetter(Sprite square, Sprite circle, int positionIndex, string letter,
+                            Vector3 position, AudioClip collectClip, Color color, Transform parent = null)
     {
-        var root = new GameObject($"Letter_{letter}");
+        var root = new GameObject($"Letter_{positionIndex:00}_{letter}");
         root.transform.position = position;
         root.transform.localScale = Vector3.one;
+        if (parent != null) root.transform.SetParent(parent, worldPositionStays: true);
 
         // Generous trigger so kids don't need to be precise.
         var col = root.AddComponent<BoxCollider2D>();
@@ -680,6 +765,7 @@ public static class DinohoppSceneBuilder
         src.spatialBlend = 0f;
 
         var lc = root.AddComponent<LetterCollectible>();
+        lc.positionIndex = positionIndex;
         lc.letter = letter;
         lc.collectClip = collectClip;
         lc.volume = 0.75f;
@@ -707,6 +793,11 @@ public static class DinohoppSceneBuilder
             case "O": BuildLetterO(visual.transform, circle, color); break;
             case "L": BuildLetterL(visual.transform, square, color); break;
             case "A": BuildLetterA(visual.transform, square, color); break;
+            case "N": BuildLetterN(visual.transform, square, color); break;
+            case "D": BuildLetterD(visual.transform, square, circle, color); break;
+            case "E": BuildLetterE(visual.transform, square, color); break;
+            case "G": BuildLetterG(visual.transform, square, circle, color); break;
+            case "R": BuildLetterR(visual.transform, square, circle, color); break;
         }
     }
 
@@ -757,6 +848,72 @@ public static class DinohoppSceneBuilder
             sortingOrder: 30, rotationZ: -18f);
         SpawnChild(parent, "Cross", square, color,
             new Vector3(0f, -0.10f, 0f), new Vector3(0.40f, 0.14f, 1f), sortingOrder: 30);
+    }
+
+    static void BuildLetterN(Transform parent, Sprite square, Color color)
+    {
+        // Two vertical posts + one diagonal slash.
+        SpawnChild(parent, "Left",  square, color,
+            new Vector3(-0.22f, 0f, 0f), new Vector3(0.18f, 0.95f, 1f), sortingOrder: 30);
+        SpawnChild(parent, "Right", square, color,
+            new Vector3( 0.22f, 0f, 0f), new Vector3(0.18f, 0.95f, 1f), sortingOrder: 30);
+        SpawnChild(parent, "Diag",  square, color,
+            new Vector3(0f, 0f, 0f), new Vector3(0.16f, 1.10f, 1f),
+            sortingOrder: 29, rotationZ: -28f);
+    }
+
+    static void BuildLetterD(Transform parent, Sprite square, Sprite circle, Color color)
+    {
+        // Vertical post on the left + a half-circle bulge on the right (outer disc
+        // with sky-coloured inner cut-out to keep the "open" hole readable).
+        SpawnChild(parent, "Spine", square, color,
+            new Vector3(-0.22f, 0f, 0f), new Vector3(0.20f, 0.95f, 1f), sortingOrder: 30);
+        SpawnChild(parent, "BulgeOuter", circle, color,
+            new Vector3(0.00f, 0f, 0f), new Vector3(0.80f, 0.90f, 1f), sortingOrder: 30);
+        SpawnChild(parent, "BulgeInner", circle, SkyColor,
+            new Vector3(0.08f, 0f, 0f), new Vector3(0.42f, 0.55f, 1f), sortingOrder: 31);
+    }
+
+    static void BuildLetterE(Transform parent, Sprite square, Color color)
+    {
+        // Spine + three horizontal bars.
+        SpawnChild(parent, "Spine", square, color,
+            new Vector3(-0.22f, 0f, 0f), new Vector3(0.20f, 0.95f, 1f), sortingOrder: 30);
+        SpawnChild(parent, "Top",   square, color,
+            new Vector3(0.04f,  0.40f, 0f), new Vector3(0.55f, 0.18f, 1f), sortingOrder: 30);
+        SpawnChild(parent, "Mid",   square, color,
+            new Vector3(0.00f,  0.00f, 0f), new Vector3(0.45f, 0.16f, 1f), sortingOrder: 30);
+        SpawnChild(parent, "Bot",   square, color,
+            new Vector3(0.04f, -0.40f, 0f), new Vector3(0.55f, 0.18f, 1f), sortingOrder: 30);
+    }
+
+    static void BuildLetterG(Transform parent, Sprite square, Sprite circle, Color color)
+    {
+        // Ring (outer + sky-cut-out) with an opening on the right + a short crossbar.
+        SpawnChild(parent, "Outer", circle, color,
+            Vector3.zero, new Vector3(0.95f, 0.95f, 1f), sortingOrder: 30);
+        SpawnChild(parent, "Inner", circle, SkyColor,
+            Vector3.zero, new Vector3(0.55f, 0.55f, 1f), sortingOrder: 31);
+        // Notch on the right that opens the ring into a G.
+        SpawnChild(parent, "Notch", square, SkyColor,
+            new Vector3(0.36f, 0.10f, 0f), new Vector3(0.45f, 0.30f, 1f), sortingOrder: 32);
+        // Short horizontal "shelf" near the middle-right.
+        SpawnChild(parent, "Shelf", square, color,
+            new Vector3(0.20f, -0.05f, 0f), new Vector3(0.32f, 0.18f, 1f), sortingOrder: 33);
+    }
+
+    static void BuildLetterR(Transform parent, Sprite square, Sprite circle, Color color)
+    {
+        // Spine + small top half-bulge + diagonal leg.
+        SpawnChild(parent, "Spine", square, color,
+            new Vector3(-0.22f, 0f, 0f), new Vector3(0.20f, 0.95f, 1f), sortingOrder: 30);
+        SpawnChild(parent, "BulgeOuter", circle, color,
+            new Vector3(0.02f, 0.22f, 0f), new Vector3(0.62f, 0.50f, 1f), sortingOrder: 30);
+        SpawnChild(parent, "BulgeInner", circle, SkyColor,
+            new Vector3(0.06f, 0.22f, 0f), new Vector3(0.30f, 0.22f, 1f), sortingOrder: 31);
+        SpawnChild(parent, "Leg", square, color,
+            new Vector3(0.12f, -0.25f, 0f), new Vector3(0.18f, 0.55f, 1f),
+            sortingOrder: 30, rotationZ: -22f);
     }
 
     struct UIRefs

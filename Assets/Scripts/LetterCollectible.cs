@@ -8,7 +8,9 @@ using UnityEngine;
 [RequireComponent(typeof(Collider2D))]
 public class LetterCollectible : MonoBehaviour
 {
-    [Tooltip("Which letter this is, e.g. 'V'. Sent to LetterCollectionManager on pickup.")]
+    [Tooltip("Position (0-based) inside the word. Lets us spell LINDENGARD with duplicate letters: each pickup is a distinct slot.")]
+    public int positionIndex = 0;
+    [Tooltip("Display letter, e.g. 'V' / 'L'. Cosmetic — manager identifies by positionIndex.")]
     public string letter = "V";
     [Tooltip("Tag that triggers collection.")]
     public string playerTag = "Player";
@@ -39,10 +41,23 @@ public class LetterCollectible : MonoBehaviour
 
     void Awake()
     {
+        CaptureOriginals();
+    }
+
+    /// <summary>
+    /// Cache the letter's pristine visual state. Called from Awake when the letter
+    /// is active at scene load, OR lazily from ResetState when the letter belongs
+    /// to a level root that started inactive (Unity skips Awake on inactive children).
+    /// </summary>
+    void CaptureOriginals()
+    {
+        if (sprites != null) return; // already captured
         col2D = GetComponent<Collider2D>();
-        col2D.isTrigger = true;
+        if (col2D != null) col2D.isTrigger = true;
         audioSource = GetComponent<AudioSource>();
-        sprites = GetComponentsInChildren<SpriteRenderer>();
+        // includeInactive: true so we find the body sprites even when our own
+        // level root hasn't been activated yet.
+        sprites = GetComponentsInChildren<SpriteRenderer>(true);
 
         originalPos = transform.position;
         originalScale = transform.localScale;
@@ -76,13 +91,16 @@ public class LetterCollectible : MonoBehaviour
         if (col2D != null) col2D.enabled = false;
 
         if (LetterCollectionManager.Instance != null)
-            LetterCollectionManager.Instance.Collect(letter);
+            LetterCollectionManager.Instance.Collect(positionIndex);
     }
 
     /// <summary>Restore the letter to its original state so it can be collected again.
     /// Called by LetterCollectionManager on a level reset.</summary>
     public void ResetState()
     {
+        // Safe to call before Awake (inactive level roots get reset too).
+        CaptureOriginals();
+
         collected = false;
         animTimer = 0f;
         transform.position = originalPos;
