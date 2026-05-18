@@ -17,6 +17,7 @@ public static class DinohoppAudioBuilder
     public const string JumpPath   = "Assets/Audio/jump.wav";
     public const string LandPath   = "Assets/Audio/land.wav";
     public const string BouncePath = "Assets/Audio/mushroom-bounce.wav";
+    public const string FallPath   = "Assets/Audio/fall_oops.wav";
 
     const string GeneratedFolder = "Assets/Audio/Generated";
 
@@ -47,20 +48,25 @@ public static class DinohoppAudioBuilder
         WriteWav(JumpPath,   JumpSamples());
         WriteWav(LandPath,   LandSamples());
         WriteWav(BouncePath, BounceSamples());
+        WriteWav(FallPath,   FallOopsSamples());
 
         // Import the new files synchronously so they're loadable immediately.
         const ImportAssetOptions opts = ImportAssetOptions.ForceUpdate | ImportAssetOptions.ForceSynchronousImport;
         AssetDatabase.ImportAsset(JumpPath,   opts);
         AssetDatabase.ImportAsset(LandPath,   opts);
         AssetDatabase.ImportAsset(BouncePath, opts);
+        AssetDatabase.ImportAsset(FallPath,   opts);
 
         Debug.Log("[Dinohopp] Placeholder audio generated in " + AudioFolder);
     }
 
-    /// <summary>Returns true if all three placeholder clips exist on disk.</summary>
+    /// <summary>Returns true if all four placeholder clips exist on disk.</summary>
     public static bool AudioExists()
     {
-        return File.Exists(JumpPath) && File.Exists(LandPath) && File.Exists(BouncePath);
+        return File.Exists(JumpPath)
+            && File.Exists(LandPath)
+            && File.Exists(BouncePath)
+            && File.Exists(FallPath);
     }
 
     [MenuItem("Tools/Dinohopp/Generate Mushroom Voices")]
@@ -236,6 +242,17 @@ public static class DinohoppAudioBuilder
             buf[i] = s * env * 0.35f;
         }
         return buf;
+    }
+
+    // Cartoony "oops!" — descending slide-whistle from high to low, gentle.
+    // Played when the dino falls below the level threshold.
+    static float[] FallOopsSamples()
+    {
+        return SineEnvClip(
+            duration: 0.40f,
+            startFreq: 700f, endFreq: 180f,    // big slide DOWN
+            attack: 0.02f, sustainEnd: 0.25f,
+            amplitude: 0.55f);
     }
 
     // Light "boing" — quick pitch bend up and back.

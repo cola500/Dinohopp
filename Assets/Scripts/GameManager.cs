@@ -26,8 +26,15 @@ public class GameManager : MonoBehaviour
     [Tooltip("If the dino's Y falls below this, treat it as a fall and show Retry.")]
     public float fallThresholdY = -7f;
 
+    [Header("Fall feedback")]
+    [Tooltip("Cartoony 'oops' clip played once when the dino falls into the pit.")]
+    public AudioClip fallClip;
+    [Range(0f, 1f)]
+    public float fallVolume = 0.65f;
+
     Vector3 dinoStartPos;
     Rigidbody2D dinoRb;
+    AudioSource sfxSource;
 
     void Awake()
     {
@@ -46,6 +53,8 @@ public class GameManager : MonoBehaviour
 
         if (cameraFollow == null && Camera.main != null)
             cameraFollow = Camera.main.GetComponent<CameraFollow2D>();
+
+        sfxSource = GetComponent<AudioSource>();
     }
 
     void Start()
@@ -59,6 +68,10 @@ public class GameManager : MonoBehaviour
         {
             if (dino != null && dino.transform.position.y < fallThresholdY)
             {
+                // Cartoony "oops" — played BEFORE reset/state-change so the trigger is
+                // bound to the single fall event (manual retry-button presses won't fire it).
+                if (sfxSource != null && fallClip != null)
+                    sfxSource.PlayOneShot(fallClip, fallVolume);
                 ResetDino();
                 SetState(State.Retry);
             }
@@ -106,6 +119,10 @@ public class GameManager : MonoBehaviour
             dinoRb.angularVelocity = 0f;
         }
         if (cameraFollow != null) cameraFollow.SnapToTarget();
+
+        // Fresh V-I-O-L-A row every restart — covers both fall-to-retry and play-again.
+        if (LetterCollectionManager.Instance != null)
+            LetterCollectionManager.Instance.ResetCollection();
     }
 
     void SetState(State s)

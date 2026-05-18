@@ -32,6 +32,7 @@ public static class DinohoppSceneBuilder
         var jumpClip          = AssetDatabase.LoadAssetAtPath<AudioClip>(DinohoppAudioBuilder.JumpPath);
         var landClip          = AssetDatabase.LoadAssetAtPath<AudioClip>(DinohoppAudioBuilder.LandPath);
         var bounceClip        = AssetDatabase.LoadAssetAtPath<AudioClip>(DinohoppAudioBuilder.BouncePath);
+        var fallClip          = AssetDatabase.LoadAssetAtPath<AudioClip>(DinohoppAudioBuilder.FallPath);
         var letterCollectClip = AssetDatabase.LoadAssetAtPath<AudioClip>(DinohoppAudioBuilder.LetterCollectPath);
         var allLettersClip    = AssetDatabase.LoadAssetAtPath<AudioClip>(DinohoppAudioBuilder.AllLettersPath);
 
@@ -83,7 +84,7 @@ public static class DinohoppSceneBuilder
         BuildLetter(square, circle, "A", new Vector3(29f,   -1.5f, 0f), letterCollectClip, palette[4]);
 
         var ui = BuildUI();
-        BuildGameManager(dino, camera, ui);
+        BuildGameManager(dino, camera, ui, fallClip);
         BuildLetterCollectionManager(ui, allLettersClip);
 
         EnsureSceneInBuildSettings();
@@ -561,9 +562,15 @@ public static class DinohoppSceneBuilder
                    sortingOrder: 7);
     }
 
-    static void BuildGameManager(GameObject dino, GameObject camera, UIRefs ui)
+    static void BuildGameManager(GameObject dino, GameObject camera, UIRefs ui, AudioClip fallClip)
     {
         var go = new GameObject("GameManager");
+
+        // 2D audio source for state-machine SFX (fall "oops" today, more later).
+        var src = go.AddComponent<AudioSource>();
+        src.playOnAwake = false;
+        src.spatialBlend = 0f;
+
         var gm = go.AddComponent<GameManager>();
         gm.dino = dino.GetComponent<DinoController>();
         gm.cameraFollow = camera.GetComponent<CameraFollow2D>();
@@ -571,6 +578,8 @@ public static class DinohoppSceneBuilder
         gm.retryPanel       = ui.retryPanel;
         gm.successPanel     = ui.successPanel;
         gm.fallThresholdY   = -7f;
+        gm.fallClip         = fallClip;
+        gm.fallVolume       = 0.65f;
     }
 
     static void BuildLetterCollectionManager(UIRefs ui, AudioClip allLettersClip)

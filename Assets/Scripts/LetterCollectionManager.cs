@@ -146,4 +146,23 @@ public class LetterCollectionManager : MonoBehaviour
 
     /// <summary>Darker, semi-transparent version used for not-yet-collected letters.</summary>
     static Color Dim(Color c) => new Color(c.r * 0.45f, c.g * 0.45f, c.b * 0.45f, 0.70f);
+
+    /// <summary>
+    /// Clear all collected letters, restore every LetterCollectible to its original
+    /// state, and reset the UI. Called by GameManager.ResetDino() so every restart
+    /// (after fall OR after success) starts with a fresh V-I-O-L-A row.
+    /// </summary>
+    public void ResetCollection()
+    {
+        collected.Clear();
+        RefreshWordText();
+        if (allCollectedPanel != null) allCollectedPanel.SetActive(false);
+        allCollectedHideAt = float.PositiveInfinity;
+        popTimer = 0f;
+        if (wordText != null) wordText.transform.localScale = wordTextBaseScale;
+
+        var all = FindObjectsByType<LetterCollectible>(
+            FindObjectsInactive.Include, FindObjectsSortMode.None);
+        for (int i = 0; i < all.Length; i++) all[i].ResetState();
+    }
 }

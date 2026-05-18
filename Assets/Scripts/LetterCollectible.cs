@@ -29,13 +29,25 @@ public class LetterCollectible : MonoBehaviour
     Vector3 collectStartScale;
     AudioSource audioSource;
     SpriteRenderer[] sprites;
+    Collider2D col2D;
+
+    // Snapshot of the letter's initial visual state, captured once at Awake.
+    // Used by ResetState() so the same letter can be re-collected next round.
+    Vector3 originalPos;
+    Vector3 originalScale;
+    Color[] originalColors;
 
     void Awake()
     {
-        var col = GetComponent<Collider2D>();
-        col.isTrigger = true;
+        col2D = GetComponent<Collider2D>();
+        col2D.isTrigger = true;
         audioSource = GetComponent<AudioSource>();
         sprites = GetComponentsInChildren<SpriteRenderer>();
+
+        originalPos = transform.position;
+        originalScale = transform.localScale;
+        originalColors = new Color[sprites.Length];
+        for (int i = 0; i < sprites.Length; i++) originalColors[i] = sprites[i].color;
     }
 
     void OnTriggerEnter2D(Collider2D other)
@@ -61,11 +73,23 @@ public class LetterCollectible : MonoBehaviour
         }
 
         // Prevent re-trigger while flying up.
-        var col = GetComponent<Collider2D>();
-        if (col != null) col.enabled = false;
+        if (col2D != null) col2D.enabled = false;
 
         if (LetterCollectionManager.Instance != null)
             LetterCollectionManager.Instance.Collect(letter);
+    }
+
+    /// <summary>Restore the letter to its original state so it can be collected again.
+    /// Called by LetterCollectionManager on a level reset.</summary>
+    public void ResetState()
+    {
+        collected = false;
+        animTimer = 0f;
+        transform.position = originalPos;
+        transform.localScale = originalScale;
+        for (int i = 0; i < sprites.Length; i++) sprites[i].color = originalColors[i];
+        if (col2D != null) col2D.enabled = true;
+        gameObject.SetActive(true);
     }
 
     void Update()
@@ -88,6 +112,8 @@ public class LetterCollectible : MonoBehaviour
             sprites[i].color = c;
         }
 
-        if (u >= 1f) Destroy(gameObject);
+        // Deactivate (don't destroy) so LetterCollectionManager can ResetState() us
+        // for a clean next round.
+        if (u >= 1f) gameObject.SetActive(false);
     }
 }
