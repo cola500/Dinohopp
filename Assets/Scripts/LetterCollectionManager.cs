@@ -60,6 +60,7 @@ public class LetterCollectionManager : MonoBehaviour
     bool[] collected;                       // indexed by position in targetWord
     AudioSource audioSource;
     DinoFeedback dinoFeedback;
+    Text allCollectedText;                  // cached from allCollectedPanel; updated per-word
     float allCollectedHideAt = float.PositiveInfinity;
     float popTimer;
     Vector3 wordTextBaseScale = Vector3.one;
@@ -81,6 +82,7 @@ public class LetterCollectionManager : MonoBehaviour
         var player = GameObject.FindWithTag("Player");
         if (player != null) dinoFeedback = player.GetComponent<DinoFeedback>();
         collected = new bool[targetWord != null ? targetWord.Length : 0];
+        if (allCollectedPanel != null) allCollectedText = allCollectedPanel.GetComponent<Text>();
     }
 
     void Start()
@@ -127,6 +129,14 @@ public class LetterCollectionManager : MonoBehaviour
         if (wordText != null) wordText.transform.localScale = wordTextBaseScale;
         ApplyFontSize();
         RefreshWordText();
+        UpdateAllCollectedText();
+    }
+
+    /// <summary>Sets the "all letters collected" panel text to match the current word.</summary>
+    void UpdateAllCollectedText()
+    {
+        if (allCollectedText != null)
+            allCollectedText.text = $"Grattis!\nDu hittade {targetWord}!";
     }
 
     /// <summary>Called by LetterCollectible.OnTriggerEnter2D with its positionIndex.</summary>

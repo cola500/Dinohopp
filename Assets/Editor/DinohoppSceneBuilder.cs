@@ -638,11 +638,12 @@ public static class DinohoppSceneBuilder
         BuildGoal(square, circle, new Vector3(34f, -1.0f, 0f), t);
 
         var palette = LetterCollectionManager.DefaultLetterColors;
-        BuildLetter(square, circle, 0, "V", new Vector3( 2f,    -1.5f, 0f), letterCollectClip, palette[0], t);
-        BuildLetter(square, circle, 1, "I", new Vector3( 5f,    -1.2f, 0f), letterCollectClip, palette[1], t);
-        BuildLetter(square, circle, 2, "O", new Vector3(10f,    -0.7f, 0f), letterCollectClip, palette[2], t);
-        BuildLetter(square, circle, 3, "L", new Vector3(17.5f,  -0.4f, 0f), letterCollectClip, palette[3], t);
-        BuildLetter(square, circle, 4, "A", new Vector3(29f,    -1.5f, 0f), letterCollectClip, palette[4], t);
+        var ic = info.skyColor;
+        BuildLetter(square, circle, 0, "V", new Vector3( 2f,    -1.5f, 0f), letterCollectClip, palette[0], ic, t);
+        BuildLetter(square, circle, 1, "I", new Vector3( 5f,    -1.2f, 0f), letterCollectClip, palette[1], ic, t);
+        BuildLetter(square, circle, 2, "O", new Vector3(10f,    -0.7f, 0f), letterCollectClip, palette[2], ic, t);
+        BuildLetter(square, circle, 3, "L", new Vector3(17.5f,  -0.4f, 0f), letterCollectClip, palette[3], ic, t);
+        BuildLetter(square, circle, 4, "A", new Vector3(29f,    -1.5f, 0f), letterCollectClip, palette[4], ic, t);
 
         return root;
     }
@@ -684,16 +685,17 @@ public static class DinohoppSceneBuilder
         // characters repeat. Heights mostly at running height; D (pos 3) sits on
         // bridge 1 and A (pos 7) sits on bridge 2 so they're collected naturally.
         var p = info.letterColors;
-        BuildLetter(square, circle, 0, "L", new Vector3( 2f,    -1.5f, 0f), letterCollectClip, p[0], t);
-        BuildLetter(square, circle, 1, "I", new Vector3( 5f,    -1.2f, 0f), letterCollectClip, p[1], t);
-        BuildLetter(square, circle, 2, "N", new Vector3( 8f,    -1.0f, 0f), letterCollectClip, p[2], t);
-        BuildLetter(square, circle, 3, "D", new Vector3(12f,    -0.4f, 0f), letterCollectClip, p[3], t); // on bridge 1
-        BuildLetter(square, circle, 4, "E", new Vector3(15f,    -1.3f, 0f), letterCollectClip, p[4], t);
-        BuildLetter(square, circle, 5, "N", new Vector3(18f,    -0.8f, 0f), letterCollectClip, p[5], t);
-        BuildLetter(square, circle, 6, "G", new Vector3(21f,    -1.2f, 0f), letterCollectClip, p[6], t);
-        BuildLetter(square, circle, 7, "A", new Vector3(24.5f,  -0.4f, 0f), letterCollectClip, p[7], t); // on bridge 2
-        BuildLetter(square, circle, 8, "R", new Vector3(28f,    -1.5f, 0f), letterCollectClip, p[8], t);
-        BuildLetter(square, circle, 9, "D", new Vector3(35f,    -1.0f, 0f), letterCollectClip, p[9], t);
+        var ic = info.skyColor;
+        BuildLetter(square, circle, 0, "L", new Vector3( 2f,    -1.5f, 0f), letterCollectClip, p[0], ic, t);
+        BuildLetter(square, circle, 1, "I", new Vector3( 5f,    -1.2f, 0f), letterCollectClip, p[1], ic, t);
+        BuildLetter(square, circle, 2, "N", new Vector3( 8f,    -1.0f, 0f), letterCollectClip, p[2], ic, t);
+        BuildLetter(square, circle, 3, "D", new Vector3(12f,    -0.4f, 0f), letterCollectClip, p[3], ic, t); // on bridge 1
+        BuildLetter(square, circle, 4, "E", new Vector3(15f,    -1.3f, 0f), letterCollectClip, p[4], ic, t);
+        BuildLetter(square, circle, 5, "N", new Vector3(18f,    -0.8f, 0f), letterCollectClip, p[5], ic, t);
+        BuildLetter(square, circle, 6, "G", new Vector3(21f,    -1.2f, 0f), letterCollectClip, p[6], ic, t);
+        BuildLetter(square, circle, 7, "A", new Vector3(24.5f,  -0.4f, 0f), letterCollectClip, p[7], ic, t); // on bridge 2
+        BuildLetter(square, circle, 8, "R", new Vector3(28f,    -1.5f, 0f), letterCollectClip, p[8], ic, t);
+        BuildLetter(square, circle, 9, "D", new Vector3(35f,    -1.0f, 0f), letterCollectClip, p[9], ic, t);
 
         return root;
     }
@@ -747,7 +749,8 @@ public static class DinohoppSceneBuilder
     // ---------- Letter builders ----------
 
     static void BuildLetter(Sprite square, Sprite circle, int positionIndex, string letter,
-                            Vector3 position, AudioClip collectClip, Color color, Transform parent = null)
+                            Vector3 position, AudioClip collectClip, Color color,
+                            Color innerCutColor, Transform parent = null)
     {
         var root = new GameObject($"Letter_{positionIndex:00}_{letter}");
         root.transform.position = position;
@@ -790,14 +793,14 @@ public static class DinohoppSceneBuilder
         {
             case "V": BuildLetterV(visual.transform, square, color); break;
             case "I": BuildLetterI(visual.transform, square, color); break;
-            case "O": BuildLetterO(visual.transform, circle, color); break;
+            case "O": BuildLetterO(visual.transform, circle, color, innerCutColor); break;
             case "L": BuildLetterL(visual.transform, square, color); break;
             case "A": BuildLetterA(visual.transform, square, color); break;
             case "N": BuildLetterN(visual.transform, square, color); break;
-            case "D": BuildLetterD(visual.transform, square, circle, color); break;
+            case "D": BuildLetterD(visual.transform, square, circle, color, innerCutColor); break;
             case "E": BuildLetterE(visual.transform, square, color); break;
-            case "G": BuildLetterG(visual.transform, square, circle, color); break;
-            case "R": BuildLetterR(visual.transform, square, circle, color); break;
+            case "G": BuildLetterG(visual.transform, square, circle, color, innerCutColor); break;
+            case "R": BuildLetterR(visual.transform, square, circle, color, innerCutColor); break;
         }
     }
 
@@ -821,12 +824,12 @@ public static class DinohoppSceneBuilder
             new Vector3(0f, -0.45f, 0f), new Vector3(0.50f, 0.14f, 1f), sortingOrder: 30);
     }
 
-    static void BuildLetterO(Transform parent, Sprite circle, Color color)
+    static void BuildLetterO(Transform parent, Sprite circle, Color color, Color innerCutColor)
     {
-        // Bright outer disc + hollow inner matching the sky background gives a ring "O".
+        // Bright outer disc + hollow inner matching the current sky → ring "O".
         SpawnChild(parent, "Outer", circle, color,
             Vector3.zero, new Vector3(0.95f, 0.95f, 1f), sortingOrder: 30);
-        SpawnChild(parent, "Inner", circle, SkyColor,
+        SpawnChild(parent, "Inner", circle, innerCutColor,
             Vector3.zero, new Vector3(0.50f, 0.50f, 1f), sortingOrder: 31);
     }
 
@@ -852,67 +855,68 @@ public static class DinohoppSceneBuilder
 
     static void BuildLetterN(Transform parent, Sprite square, Color color)
     {
-        // Two vertical posts + one diagonal slash.
+        // Two thick vertical posts + a fat diagonal joining top-left to bottom-right.
         SpawnChild(parent, "Left",  square, color,
-            new Vector3(-0.22f, 0f, 0f), new Vector3(0.18f, 0.95f, 1f), sortingOrder: 30);
+            new Vector3(-0.26f, 0f, 0f), new Vector3(0.24f, 0.95f, 1f), sortingOrder: 30);
         SpawnChild(parent, "Right", square, color,
-            new Vector3( 0.22f, 0f, 0f), new Vector3(0.18f, 0.95f, 1f), sortingOrder: 30);
+            new Vector3( 0.26f, 0f, 0f), new Vector3(0.24f, 0.95f, 1f), sortingOrder: 30);
         SpawnChild(parent, "Diag",  square, color,
-            new Vector3(0f, 0f, 0f), new Vector3(0.16f, 1.10f, 1f),
-            sortingOrder: 29, rotationZ: -28f);
+            Vector3.zero, new Vector3(0.22f, 1.12f, 1f),
+            sortingOrder: 29, rotationZ: -27f);
     }
 
-    static void BuildLetterD(Transform parent, Sprite square, Sprite circle, Color color)
+    static void BuildLetterD(Transform parent, Sprite square, Sprite circle, Color color, Color innerCutColor)
     {
-        // Vertical post on the left + a half-circle bulge on the right (outer disc
-        // with sky-coloured inner cut-out to keep the "open" hole readable).
+        // Thick spine + tall right bulge with a clear opening that reads as a D
+        // (not an O) thanks to the inner cut shifted RIGHT.
         SpawnChild(parent, "Spine", square, color,
-            new Vector3(-0.22f, 0f, 0f), new Vector3(0.20f, 0.95f, 1f), sortingOrder: 30);
+            new Vector3(-0.26f, 0f, 0f), new Vector3(0.24f, 0.95f, 1f), sortingOrder: 30);
         SpawnChild(parent, "BulgeOuter", circle, color,
-            new Vector3(0.00f, 0f, 0f), new Vector3(0.80f, 0.90f, 1f), sortingOrder: 30);
-        SpawnChild(parent, "BulgeInner", circle, SkyColor,
-            new Vector3(0.08f, 0f, 0f), new Vector3(0.42f, 0.55f, 1f), sortingOrder: 31);
+            new Vector3(0.04f, 0f, 0f), new Vector3(0.82f, 0.95f, 1f), sortingOrder: 30);
+        SpawnChild(parent, "BulgeInner", circle, innerCutColor,
+            new Vector3(0.12f, 0f, 0f), new Vector3(0.46f, 0.62f, 1f), sortingOrder: 31);
     }
 
     static void BuildLetterE(Transform parent, Sprite square, Color color)
     {
-        // Spine + three horizontal bars.
+        // Thick spine + three even horizontal bars (top, mid, bot).
         SpawnChild(parent, "Spine", square, color,
-            new Vector3(-0.22f, 0f, 0f), new Vector3(0.20f, 0.95f, 1f), sortingOrder: 30);
-        SpawnChild(parent, "Top",   square, color,
-            new Vector3(0.04f,  0.40f, 0f), new Vector3(0.55f, 0.18f, 1f), sortingOrder: 30);
-        SpawnChild(parent, "Mid",   square, color,
-            new Vector3(0.00f,  0.00f, 0f), new Vector3(0.45f, 0.16f, 1f), sortingOrder: 30);
-        SpawnChild(parent, "Bot",   square, color,
-            new Vector3(0.04f, -0.40f, 0f), new Vector3(0.55f, 0.18f, 1f), sortingOrder: 30);
+            new Vector3(-0.26f, 0f, 0f), new Vector3(0.24f, 0.95f, 1f), sortingOrder: 30);
+        SpawnChild(parent, "Top", square, color,
+            new Vector3(0.04f,  0.40f, 0f), new Vector3(0.60f, 0.20f, 1f), sortingOrder: 30);
+        SpawnChild(parent, "Mid", square, color,
+            new Vector3(0.00f,  0.00f, 0f), new Vector3(0.48f, 0.18f, 1f), sortingOrder: 30);
+        SpawnChild(parent, "Bot", square, color,
+            new Vector3(0.04f, -0.40f, 0f), new Vector3(0.60f, 0.20f, 1f), sortingOrder: 30);
     }
 
-    static void BuildLetterG(Transform parent, Sprite square, Sprite circle, Color color)
+    static void BuildLetterG(Transform parent, Sprite square, Sprite circle, Color color, Color innerCutColor)
     {
-        // Ring (outer + sky-cut-out) with an opening on the right + a short crossbar.
+        // Ring (outer + cut-out) with a LARGE right-side notch + thick inward shelf
+        // so it reads as G — never C, never O.
         SpawnChild(parent, "Outer", circle, color,
             Vector3.zero, new Vector3(0.95f, 0.95f, 1f), sortingOrder: 30);
-        SpawnChild(parent, "Inner", circle, SkyColor,
-            Vector3.zero, new Vector3(0.55f, 0.55f, 1f), sortingOrder: 31);
-        // Notch on the right that opens the ring into a G.
-        SpawnChild(parent, "Notch", square, SkyColor,
-            new Vector3(0.36f, 0.10f, 0f), new Vector3(0.45f, 0.30f, 1f), sortingOrder: 32);
-        // Short horizontal "shelf" near the middle-right.
+        SpawnChild(parent, "Inner", circle, innerCutColor,
+            Vector3.zero, new Vector3(0.52f, 0.55f, 1f), sortingOrder: 31);
+        // Big notch — unmistakable opening on the right.
+        SpawnChild(parent, "Notch", square, innerCutColor,
+            new Vector3(0.46f, 0.18f, 0f), new Vector3(0.52f, 0.42f, 1f), sortingOrder: 32);
+        // Horizontal shelf inside the ring (the bar that makes G ≠ C).
         SpawnChild(parent, "Shelf", square, color,
-            new Vector3(0.20f, -0.05f, 0f), new Vector3(0.32f, 0.18f, 1f), sortingOrder: 33);
+            new Vector3(0.18f, -0.05f, 0f), new Vector3(0.42f, 0.20f, 1f), sortingOrder: 33);
     }
 
-    static void BuildLetterR(Transform parent, Sprite square, Sprite circle, Color color)
+    static void BuildLetterR(Transform parent, Sprite square, Sprite circle, Color color, Color innerCutColor)
     {
-        // Spine + small top half-bulge + diagonal leg.
+        // Thick spine + clear top half-bulge + fat diagonal leg — never P, never K.
         SpawnChild(parent, "Spine", square, color,
-            new Vector3(-0.22f, 0f, 0f), new Vector3(0.20f, 0.95f, 1f), sortingOrder: 30);
+            new Vector3(-0.26f, 0f, 0f), new Vector3(0.24f, 0.95f, 1f), sortingOrder: 30);
         SpawnChild(parent, "BulgeOuter", circle, color,
-            new Vector3(0.02f, 0.22f, 0f), new Vector3(0.62f, 0.50f, 1f), sortingOrder: 30);
-        SpawnChild(parent, "BulgeInner", circle, SkyColor,
-            new Vector3(0.06f, 0.22f, 0f), new Vector3(0.30f, 0.22f, 1f), sortingOrder: 31);
+            new Vector3(0.05f, 0.25f, 0f), new Vector3(0.68f, 0.52f, 1f), sortingOrder: 30);
+        SpawnChild(parent, "BulgeInner", circle, innerCutColor,
+            new Vector3(0.12f, 0.25f, 0f), new Vector3(0.34f, 0.24f, 1f), sortingOrder: 31);
         SpawnChild(parent, "Leg", square, color,
-            new Vector3(0.12f, -0.25f, 0f), new Vector3(0.18f, 0.55f, 1f),
+            new Vector3(0.18f, -0.28f, 0f), new Vector3(0.24f, 0.58f, 1f),
             sortingOrder: 30, rotationZ: -22f);
     }
 
