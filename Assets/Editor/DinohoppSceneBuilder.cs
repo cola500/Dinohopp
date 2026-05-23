@@ -867,9 +867,10 @@ public static class DinohoppSceneBuilder
         root.transform.localScale = Vector3.one;
         if (parent != null) root.transform.SetParent(parent, worldPositionStays: true);
 
-        // Generous trigger so kids don't need to be precise.
+        // Generous trigger so kids don't need to be precise. Sized to match the
+        // bigger backplate + glyph below.
         var col = root.AddComponent<BoxCollider2D>();
-        col.size = new Vector2(1.1f, 1.3f);
+        col.size = new Vector2(1.4f, 1.6f);
         col.offset = Vector2.zero;
         col.isTrigger = true;
 
@@ -893,11 +894,11 @@ public static class DinohoppSceneBuilder
         bob.phaseOffset = position.x * 0.4f;
 
         // Soft dark backplate — gives every letter a halo/outline against the
-        // bright pastel sky, regardless of the fill color underneath. Sorted
-        // below the letter shape so it only peeks out around the edges.
-        var backplate = new Color(0.10f, 0.15f, 0.25f, 0.55f);
+        // bright pastel sky, regardless of the fill color underneath. Sized to
+        // host the chunky text glyph below with comfortable breathing room.
+        var backplate = new Color(0.10f, 0.15f, 0.25f, 0.62f);
         SpawnChild(visual.transform, "Backplate", circle, backplate,
-            Vector3.zero, new Vector3(1.15f, 1.15f, 1f), sortingOrder: 28);
+            Vector3.zero, new Vector3(1.45f, 1.45f, 1f), sortingOrder: 28);
 
         // Render the glyph as actual text instead of composite primitives. This
         // guarantees correct orientation (procedural builds had a backwards A, a
@@ -920,8 +921,8 @@ public static class DinohoppSceneBuilder
 
         var tm = go.AddComponent<TextMesh>();
         tm.text = letter;
-        tm.fontSize = 160;
-        tm.characterSize = 0.0095f;  // ~ 1.0 unit glyph height with this fontSize
+        tm.fontSize = 200;
+        tm.characterSize = 0.014f;   // chunky preschool-readable glyph (~1.5 units cap height)
         tm.color = color;
         tm.anchor = TextAnchor.MiddleCenter;
         tm.alignment = TextAlignment.Center;

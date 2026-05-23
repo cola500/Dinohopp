@@ -53,9 +53,9 @@ public class LetterCollectionManager : MonoBehaviour
 
     [Header("Font sizing")]
     [Tooltip("Word-text font size for short words (≤ 5 letters).")]
-    public int fontSizeShort = 130;
+    public int fontSizeShort = 140;
     [Tooltip("Word-text font size for long words (> 5 letters).")]
-    public int fontSizeLong = 90;
+    public int fontSizeLong = 100;
 
     bool[] collected;                       // indexed by position in targetWord
     AudioSource audioSource;
