@@ -14,6 +14,116 @@ public static class DinohoppSceneBuilder
     // Shared sky color — also used as the "hollow" inside Letter O so the ring reads.
     static readonly Color SkyColor = new Color(0.62f, 0.82f, 0.93f, 1f);
 
+    [MenuItem("Tools/Dinohopp/Validate Letters")]
+    public static void ValidateLetters()
+    {
+        int errors = 0;
+        int passes = 0;
+
+        var letters = Object.FindObjectsByType<LetterCollectible>(FindObjectsInactive.Include);
+        var levels  = Object.FindObjectsByType<LevelInfo>(FindObjectsInactive.Include);
+
+        foreach (var lev in levels)
+        {
+            bool levelOK = true;
+            var lettersInLevel = new System.Collections.Generic.List<LetterCollectible>();
+            for (int i = 0; i < letters.Length; i++)
+                if (letters[i].transform.IsChildOf(lev.transform)) lettersInLevel.Add(letters[i]);
+            lettersInLevel.Sort((a, b) => a.positionIndex.CompareTo(b.positionIndex));
+
+            if (lettersInLevel.Count != lev.wordToCollect.Length)
+            {
+                Debug.LogError($"[Validate] {lev.displayName}: expected {lev.wordToCollect.Length} letters, found {lettersInLevel.Count}");
+                errors++; levelOK = false;
+            }
+
+            for (int i = 0; i < lettersInLevel.Count; i++)
+            {
+                var lc = lettersInLevel[i];
+
+                if (lc.positionIndex < 0 || lc.positionIndex >= lev.wordToCollect.Length)
+                {
+                    Debug.LogError($"[Validate] {lev.displayName} {lc.name}: positionIndex {lc.positionIndex} out of range");
+                    errors++; levelOK = false; continue;
+                }
+
+                string expected = lev.wordToCollect[lc.positionIndex].ToString();
+                if (lc.letter != expected)
+                {
+                    Debug.LogError($"[Validate] {lev.displayName} {lc.name}: letter '{lc.letter}' != word[{lc.positionIndex}] '{expected}'");
+                    errors++; levelOK = false;
+                }
+
+                var ls = lc.transform.localScale;
+                if (ls.x <= 0f || ls.y <= 0f)
+                {
+                    Debug.LogError($"[Validate] {lev.displayName} {lc.name}: localScale has non-positive axis ({ls})");
+                    errors++; levelOK = false;
+                }
+
+                var visual = lc.transform.Find("Visual");
+                if (visual != null)
+                {
+                    var vs = visual.localScale;
+                    if (vs.x <= 0f || vs.y <= 0f)
+                    {
+                        Debug.LogError($"[Validate] {lev.displayName} {lc.name}/Visual: localScale non-positive ({vs})");
+                        errors++; levelOK = false;
+                    }
+                    var vr = visual.localEulerAngles;
+                    float zDelta = Mathf.Abs(Mathf.DeltaAngle(vr.z, 0f));
+                    if (zDelta > 1f)
+                    {
+                        Debug.LogError($"[Validate] {lev.displayName} {lc.name}/Visual: rotation Z = {vr.z}°, should be 0");
+                        errors++; levelOK = false;
+                    }
+                }
+
+                var tm = lc.GetComponentInChildren<TextMesh>(true);
+                if (tm == null)
+                {
+                    Debug.LogError($"[Validate] {lev.displayName} {lc.name}: no TextMesh glyph found");
+                    errors++; levelOK = false;
+                }
+                else
+                {
+                    if (tm.text != expected)
+                    {
+                        Debug.LogError($"[Validate] {lev.displayName} {lc.name}: TextMesh '{tm.text}' != expected '{expected}'");
+                        errors++; levelOK = false;
+                    }
+                    // Glyph itself must not be flipped or rotated.
+                    var ts = tm.transform.localScale;
+                    if (ts.x <= 0f || ts.y <= 0f)
+                    {
+                        Debug.LogError($"[Validate] {lev.displayName} {lc.name}: glyph localScale non-positive ({ts})");
+                        errors++; levelOK = false;
+                    }
+                    var tr = tm.transform.localEulerAngles;
+                    if (Mathf.Abs(Mathf.DeltaAngle(tr.z, 0f)) > 1f)
+                    {
+                        Debug.LogError($"[Validate] {lev.displayName} {lc.name}: glyph rotation Z = {tr.z}°, should be 0");
+                        errors++; levelOK = false;
+                    }
+                }
+            }
+
+            if (levelOK)
+            {
+                var collected = new System.Text.StringBuilder();
+                for (int i = 0; i < lettersInLevel.Count; i++)
+                {
+                    if (i > 0) collected.Append(' ');
+                    collected.Append(lettersInLevel[i].letter);
+                }
+                Debug.Log($"[Validate] PASS: {lev.displayName} letters {collected}");
+                passes++;
+            }
+        }
+
+        Debug.Log($"[Validate] Done — {passes} level(s) OK, {errors} error(s)");
+    }
+
     [MenuItem("Tools/Dinohopp/Log Alignment")]
     public static void LogAlignment()
     {
@@ -789,135 +899,38 @@ public static class DinohoppSceneBuilder
         SpawnChild(visual.transform, "Backplate", circle, backplate,
             Vector3.zero, new Vector3(1.15f, 1.15f, 1f), sortingOrder: 28);
 
-        switch (letter)
-        {
-            case "V": BuildLetterV(visual.transform, square, color); break;
-            case "I": BuildLetterI(visual.transform, square, color); break;
-            case "O": BuildLetterO(visual.transform, circle, color, innerCutColor); break;
-            case "L": BuildLetterL(visual.transform, square, color); break;
-            case "A": BuildLetterA(visual.transform, square, color); break;
-            case "N": BuildLetterN(visual.transform, square, color); break;
-            case "D": BuildLetterD(visual.transform, square, circle, color, innerCutColor); break;
-            case "E": BuildLetterE(visual.transform, square, color); break;
-            case "G": BuildLetterG(visual.transform, square, circle, color, innerCutColor); break;
-            case "R": BuildLetterR(visual.transform, square, circle, color, innerCutColor); break;
-        }
+        // Render the glyph as actual text instead of composite primitives. This
+        // guarantees correct orientation (procedural builds had a backwards A, a
+        // mirrored N, and a mirrored R). Live font = LegacyRuntime.ttf (same as UI).
+        BuildLetterText(visual.transform, letter, color);
     }
 
-    static void BuildLetterV(Transform parent, Sprite square, Color color)
+    /// <summary>
+    /// Add a TextMesh glyph for the letter. Lives under a neutral child whose
+    /// localScale is forced to (1,1,1) and localRotation to identity so no parent
+    /// flip can ever mirror or rotate the letter.
+    /// </summary>
+    static void BuildLetterText(Transform parent, string letter, Color color)
     {
-        SpawnChild(parent, "Left",  square, color,
-            new Vector3(-0.20f, 0f, 0f), new Vector3(0.15f, 0.95f, 1f),
-            sortingOrder: 30, rotationZ: 18f);
-        SpawnChild(parent, "Right", square, color,
-            new Vector3( 0.20f, 0f, 0f), new Vector3(0.15f, 0.95f, 1f),
-            sortingOrder: 30, rotationZ: -18f);
-    }
+        var go = new GameObject($"Glyph_{letter}");
+        go.transform.SetParent(parent, worldPositionStays: false);
+        go.transform.localPosition = new Vector3(0f, -0.04f, 0f); // tiny optical centring
+        go.transform.localScale = Vector3.one;
+        go.transform.localRotation = Quaternion.identity;
 
-    static void BuildLetterI(Transform parent, Sprite square, Color color)
-    {
-        SpawnChild(parent, "Bar",    square, color,
-            Vector3.zero, new Vector3(0.22f, 0.95f, 1f), sortingOrder: 30);
-        SpawnChild(parent, "Top",    square, color,
-            new Vector3(0f,  0.45f, 0f), new Vector3(0.50f, 0.14f, 1f), sortingOrder: 30);
-        SpawnChild(parent, "Bottom", square, color,
-            new Vector3(0f, -0.45f, 0f), new Vector3(0.50f, 0.14f, 1f), sortingOrder: 30);
-    }
+        var tm = go.AddComponent<TextMesh>();
+        tm.text = letter;
+        tm.fontSize = 160;
+        tm.characterSize = 0.0095f;  // ~ 1.0 unit glyph height with this fontSize
+        tm.color = color;
+        tm.anchor = TextAnchor.MiddleCenter;
+        tm.alignment = TextAlignment.Center;
+        tm.font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
+        tm.fontStyle = FontStyle.Bold;
 
-    static void BuildLetterO(Transform parent, Sprite circle, Color color, Color innerCutColor)
-    {
-        // Bright outer disc + hollow inner matching the current sky → ring "O".
-        SpawnChild(parent, "Outer", circle, color,
-            Vector3.zero, new Vector3(0.95f, 0.95f, 1f), sortingOrder: 30);
-        SpawnChild(parent, "Inner", circle, innerCutColor,
-            Vector3.zero, new Vector3(0.50f, 0.50f, 1f), sortingOrder: 31);
-    }
-
-    static void BuildLetterL(Transform parent, Sprite square, Color color)
-    {
-        SpawnChild(parent, "Vert",  square, color,
-            new Vector3(-0.20f, 0f, 0f), new Vector3(0.20f, 0.95f, 1f), sortingOrder: 30);
-        SpawnChild(parent, "Base",  square, color,
-            new Vector3( 0.05f, -0.38f, 0f), new Vector3(0.55f, 0.20f, 1f), sortingOrder: 30);
-    }
-
-    static void BuildLetterA(Transform parent, Sprite square, Color color)
-    {
-        SpawnChild(parent, "Left",  square, color,
-            new Vector3(-0.20f, 0f, 0f), new Vector3(0.15f, 0.95f, 1f),
-            sortingOrder: 30, rotationZ: 18f);
-        SpawnChild(parent, "Right", square, color,
-            new Vector3( 0.20f, 0f, 0f), new Vector3(0.15f, 0.95f, 1f),
-            sortingOrder: 30, rotationZ: -18f);
-        SpawnChild(parent, "Cross", square, color,
-            new Vector3(0f, -0.10f, 0f), new Vector3(0.40f, 0.14f, 1f), sortingOrder: 30);
-    }
-
-    static void BuildLetterN(Transform parent, Sprite square, Color color)
-    {
-        // Two thick vertical posts + a fat diagonal joining top-left to bottom-right.
-        SpawnChild(parent, "Left",  square, color,
-            new Vector3(-0.26f, 0f, 0f), new Vector3(0.24f, 0.95f, 1f), sortingOrder: 30);
-        SpawnChild(parent, "Right", square, color,
-            new Vector3( 0.26f, 0f, 0f), new Vector3(0.24f, 0.95f, 1f), sortingOrder: 30);
-        SpawnChild(parent, "Diag",  square, color,
-            Vector3.zero, new Vector3(0.22f, 1.12f, 1f),
-            sortingOrder: 29, rotationZ: -27f);
-    }
-
-    static void BuildLetterD(Transform parent, Sprite square, Sprite circle, Color color, Color innerCutColor)
-    {
-        // Thick spine + tall right bulge with a clear opening that reads as a D
-        // (not an O) thanks to the inner cut shifted RIGHT.
-        SpawnChild(parent, "Spine", square, color,
-            new Vector3(-0.26f, 0f, 0f), new Vector3(0.24f, 0.95f, 1f), sortingOrder: 30);
-        SpawnChild(parent, "BulgeOuter", circle, color,
-            new Vector3(0.04f, 0f, 0f), new Vector3(0.82f, 0.95f, 1f), sortingOrder: 30);
-        SpawnChild(parent, "BulgeInner", circle, innerCutColor,
-            new Vector3(0.12f, 0f, 0f), new Vector3(0.46f, 0.62f, 1f), sortingOrder: 31);
-    }
-
-    static void BuildLetterE(Transform parent, Sprite square, Color color)
-    {
-        // Thick spine + three even horizontal bars (top, mid, bot).
-        SpawnChild(parent, "Spine", square, color,
-            new Vector3(-0.26f, 0f, 0f), new Vector3(0.24f, 0.95f, 1f), sortingOrder: 30);
-        SpawnChild(parent, "Top", square, color,
-            new Vector3(0.04f,  0.40f, 0f), new Vector3(0.60f, 0.20f, 1f), sortingOrder: 30);
-        SpawnChild(parent, "Mid", square, color,
-            new Vector3(0.00f,  0.00f, 0f), new Vector3(0.48f, 0.18f, 1f), sortingOrder: 30);
-        SpawnChild(parent, "Bot", square, color,
-            new Vector3(0.04f, -0.40f, 0f), new Vector3(0.60f, 0.20f, 1f), sortingOrder: 30);
-    }
-
-    static void BuildLetterG(Transform parent, Sprite square, Sprite circle, Color color, Color innerCutColor)
-    {
-        // Ring (outer + cut-out) with a LARGE right-side notch + thick inward shelf
-        // so it reads as G — never C, never O.
-        SpawnChild(parent, "Outer", circle, color,
-            Vector3.zero, new Vector3(0.95f, 0.95f, 1f), sortingOrder: 30);
-        SpawnChild(parent, "Inner", circle, innerCutColor,
-            Vector3.zero, new Vector3(0.52f, 0.55f, 1f), sortingOrder: 31);
-        // Big notch — unmistakable opening on the right.
-        SpawnChild(parent, "Notch", square, innerCutColor,
-            new Vector3(0.46f, 0.18f, 0f), new Vector3(0.52f, 0.42f, 1f), sortingOrder: 32);
-        // Horizontal shelf inside the ring (the bar that makes G ≠ C).
-        SpawnChild(parent, "Shelf", square, color,
-            new Vector3(0.18f, -0.05f, 0f), new Vector3(0.42f, 0.20f, 1f), sortingOrder: 33);
-    }
-
-    static void BuildLetterR(Transform parent, Sprite square, Sprite circle, Color color, Color innerCutColor)
-    {
-        // Thick spine + clear top half-bulge + fat diagonal leg — never P, never K.
-        SpawnChild(parent, "Spine", square, color,
-            new Vector3(-0.26f, 0f, 0f), new Vector3(0.24f, 0.95f, 1f), sortingOrder: 30);
-        SpawnChild(parent, "BulgeOuter", circle, color,
-            new Vector3(0.05f, 0.25f, 0f), new Vector3(0.68f, 0.52f, 1f), sortingOrder: 30);
-        SpawnChild(parent, "BulgeInner", circle, innerCutColor,
-            new Vector3(0.12f, 0.25f, 0f), new Vector3(0.34f, 0.24f, 1f), sortingOrder: 31);
-        SpawnChild(parent, "Leg", square, color,
-            new Vector3(0.18f, -0.28f, 0f), new Vector3(0.24f, 0.58f, 1f),
-            sortingOrder: 30, rotationZ: -22f);
+        var mr = go.GetComponent<MeshRenderer>();
+        mr.sortingOrder = 32; // above backplate (28)
+        if (tm.font != null) mr.sharedMaterial = tm.font.material;
     }
 
     struct UIRefs

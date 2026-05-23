@@ -31,6 +31,7 @@ public class LetterCollectible : MonoBehaviour
     Vector3 collectStartScale;
     AudioSource audioSource;
     SpriteRenderer[] sprites;
+    TextMesh[] textMeshes;
     Collider2D col2D;
 
     // Snapshot of the letter's initial visual state, captured once at Awake.
@@ -38,6 +39,7 @@ public class LetterCollectible : MonoBehaviour
     Vector3 originalPos;
     Vector3 originalScale;
     Color[] originalColors;
+    Color[] originalTextColors;
 
     void Awake()
     {
@@ -55,14 +57,17 @@ public class LetterCollectible : MonoBehaviour
         col2D = GetComponent<Collider2D>();
         if (col2D != null) col2D.isTrigger = true;
         audioSource = GetComponent<AudioSource>();
-        // includeInactive: true so we find the body sprites even when our own
-        // level root hasn't been activated yet.
-        sprites = GetComponentsInChildren<SpriteRenderer>(true);
+        // includeInactive: true so we find the body sprites + text meshes even when
+        // our own level root hasn't been activated yet.
+        sprites     = GetComponentsInChildren<SpriteRenderer>(true);
+        textMeshes  = GetComponentsInChildren<TextMesh>(true);
 
         originalPos = transform.position;
         originalScale = transform.localScale;
         originalColors = new Color[sprites.Length];
         for (int i = 0; i < sprites.Length; i++) originalColors[i] = sprites[i].color;
+        originalTextColors = new Color[textMeshes.Length];
+        for (int i = 0; i < textMeshes.Length; i++) originalTextColors[i] = textMeshes[i].color;
     }
 
     void OnTriggerEnter2D(Collider2D other)
@@ -106,6 +111,7 @@ public class LetterCollectible : MonoBehaviour
         transform.position = originalPos;
         transform.localScale = originalScale;
         for (int i = 0; i < sprites.Length; i++) sprites[i].color = originalColors[i];
+        for (int i = 0; i < textMeshes.Length; i++) textMeshes[i].color = originalTextColors[i];
         if (col2D != null) col2D.enabled = true;
         gameObject.SetActive(true);
     }
@@ -128,6 +134,12 @@ public class LetterCollectible : MonoBehaviour
             var c = sprites[i].color;
             c.a = alpha;
             sprites[i].color = c;
+        }
+        for (int i = 0; i < textMeshes.Length; i++)
+        {
+            var c = textMeshes[i].color;
+            c.a = alpha;
+            textMeshes[i].color = c;
         }
 
         // Deactivate (don't destroy) so LetterCollectionManager can ResetState() us
