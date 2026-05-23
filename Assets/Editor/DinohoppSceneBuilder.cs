@@ -870,7 +870,7 @@ public static class DinohoppSceneBuilder
         // Generous trigger so kids don't need to be precise. Sized to match the
         // bigger backplate + glyph below.
         var col = root.AddComponent<BoxCollider2D>();
-        col.size = new Vector2(1.4f, 1.6f);
+        col.size = new Vector2(1.5f, 1.7f);
         col.offset = Vector2.zero;
         col.isTrigger = true;
 
@@ -898,7 +898,7 @@ public static class DinohoppSceneBuilder
         // host the chunky text glyph below with comfortable breathing room.
         var backplate = new Color(0.10f, 0.15f, 0.25f, 0.62f);
         SpawnChild(visual.transform, "Backplate", circle, backplate,
-            Vector3.zero, new Vector3(1.45f, 1.45f, 1f), sortingOrder: 28);
+            Vector3.zero, new Vector3(1.60f, 1.60f, 1f), sortingOrder: 28);
 
         // Render the glyph as actual text instead of composite primitives. This
         // guarantees correct orientation (procedural builds had a backwards A, a
@@ -922,7 +922,9 @@ public static class DinohoppSceneBuilder
         var tm = go.AddComponent<TextMesh>();
         tm.text = letter;
         tm.fontSize = 200;
-        tm.characterSize = 0.014f;   // chunky preschool-readable glyph (~1.5 units cap height)
+        // TextMesh's effective world height ≈ characterSize × fontSize × 0.07.
+        // With 200 × 0.08 we land at ~1.1 units → fills ~70% of the 1.6-wide backplate.
+        tm.characterSize = 0.08f;
         tm.color = color;
         tm.anchor = TextAnchor.MiddleCenter;
         tm.alignment = TextAlignment.Center;
