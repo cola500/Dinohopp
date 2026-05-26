@@ -588,90 +588,42 @@ public static class DinohoppSceneBuilder
         fb.joyScale = new Vector2(1.18f, 1.18f);
 
         // Locomotion: idle breathing while paused, footstep bob while running.
-        // Added after BuildDino creates the Visual child (added below) so the script
-        // can find it via transform.Find in Awake.
+        // Operates on the Visual child's transform — composes cleanly with the
+        // sprite-swap animator (which doesn't touch scale/position).
         var loco = root.AddComponent<DinoLocomotion>();
         loco.breathFrequency = 0.45f;
         loco.breathAmount = 0.04f;
         loco.runBobFrequency = 4.0f;
         loco.runBobAmount = 0.04f;
 
-        // ---- Visual hierarchy ----
-        // Two nested transforms so DinoLocomotion (bob + breath on Visual) and
-        // DinoSurfaceVisualOffset (mushroom-cap parabola on SurfaceCurve) compose
-        // without fighting over the same property:
-        //   root.scale    ← squash/stretch/joy (DinoFeedback)
-        //   Visual        ← idle breathing + running footstep bob (DinoLocomotion)
-        //   SurfaceCurve  ← parabolic lift on mushrooms (DinoSurfaceVisualOffset)
-        //   body parts    ← children of SurfaceCurve
+        // ---- Sprite-based visual ----
+        // Compositional layering of root.scale (squash/stretch/joy via DinoFeedback)
+        // + Visual.localScale/position (breath + bob via DinoLocomotion) + sprite
+        // swap (Idle/Run/Jump/Fall via Animator).
+        //
+        // Visual.localPosition.y = -0.715 puts the sprite's "feet" pivot exactly at
+        // the collider bottom, so the dino sits on every surface without hovering.
+        // (Pivot is at 0.10 of sprite height = ~0.15 world units up from sprite
+        // bottom; the sprite itself is 1.5 world units tall.)
         var visual = new GameObject("Visual");
         visual.transform.SetParent(root.transform, worldPositionStays: false);
-        // Drop the whole rig 0.25 down so the feet sprites' bottom edge matches
-        // the collider bottom (-0.715). Without this offset the feet hover 0.25
-        // units above every surface and dino looks like it's walking on air.
-        visual.transform.localPosition = new Vector3(0f, -0.25f, 0f);
+        visual.transform.localPosition = new Vector3(0f, -0.715f, 0f);
 
-        var surfaceCurve = new GameObject("SurfaceCurve");
-        surfaceCurve.transform.SetParent(visual.transform, worldPositionStays: false);
+        var sr = visual.AddComponent<SpriteRenderer>();
+        sr.sprite = AssetDatabase.LoadAssetAtPath<Sprite>(
+            DinohoppDinoSpriteBuilder.SpriteDir + "/Dino_Idle.png");
+        sr.sortingOrder = 5; // above ground decor (2-3) and behind UI/letters (28+)
 
-        var bodyColor = new Color(0.95f, 0.55f, 0.15f); // bright orange
-        var darkBody  = new Color(0.75f, 0.40f, 0.10f); // shadowed orange for feet
-        var eyeWhite  = Color.white;
-        var eyePupil  = new Color(0.10f, 0.10f, 0.20f); // near-black, slight blue tint
+        var animator = visual.AddComponent<Animator>();
+        animator.runtimeAnimatorController = AssetDatabase.LoadAssetAtPath<RuntimeAnimatorController>(
+            "Assets/Animation/DinoAnimator.controller");
+        animator.applyRootMotion = false;
+        animator.updateMode = AnimatorUpdateMode.Normal;
+        animator.cullingMode = AnimatorCullingMode.AlwaysAnimate;
 
-        // Tail — slim rect, pointed up-back. Sorted behind body so it tucks in.
-        SpawnChild(surfaceCurve.transform, "Tail", square, bodyColor,
-                   localPos:   new Vector3(-0.35f, 0.00f, 0f),
-                   localScale: new Vector3(0.32f, 0.12f, 1f),
-                   sortingOrder: 1,
-                   rotationZ: 20f);
-
-        // Body — wide round blob.
-        SpawnChild(surfaceCurve.transform, "Body", circle, bodyColor,
-                   localPos:   new Vector3(0.00f, -0.05f, 0f),
-                   localScale: new Vector3(0.78f, 0.70f, 1f),
-                   sortingOrder: 2);
-
-        // Two stubby feet, slightly darker for a hint of shading.
-        SpawnChild(surfaceCurve.transform, "Foot_Left", square, darkBody,
-                   localPos:   new Vector3(-0.07f, -0.40f, 0f),
-                   localScale: new Vector3(0.20f, 0.13f, 1f),
-                   sortingOrder: 3);
-        SpawnChild(surfaceCurve.transform, "Foot_Right", square, darkBody,
-                   localPos:   new Vector3(0.20f, -0.40f, 0f),
-                   localScale: new Vector3(0.20f, 0.13f, 1f),
-                   sortingOrder: 3);
-
-        // Head — large round head front-and-up of the body.
-        SpawnChild(surfaceCurve.transform, "Head", circle, bodyColor,
-                   localPos:   new Vector3(0.28f, 0.22f, 0f),
-                   localScale: new Vector3(0.48f, 0.48f, 1f),
-                   sortingOrder: 4);
-
-        // Big friendly eye — white sclera + dark pupil offset slightly forward.
-        SpawnChild(surfaceCurve.transform, "Eye_White", circle, eyeWhite,
-                   localPos:   new Vector3(0.36f, 0.28f, 0f),
-                   localScale: new Vector3(0.18f, 0.18f, 1f),
-                   sortingOrder: 5);
-        SpawnChild(surfaceCurve.transform, "Eye_Pupil", circle, eyePupil,
-                   localPos:   new Vector3(0.40f, 0.27f, 0f),
-                   localScale: new Vector3(0.09f, 0.09f, 1f),
-                   sortingOrder: 6);
-
-        // Subtle blink — added after the eye children exist so DinoBlink can find them.
-        var blink = root.AddComponent<DinoBlink>();
-        blink.minInterval = 3f;
-        blink.maxInterval = 6f;
-        blink.blinkDuration = 0.10f;
-        blink.closedScaleY = 0.10f;
-
-        // Visual sink along the mushroom cap's oval edge — pure cosmetic.
-        // Collider top equals the cap's PEAK so centre offset is 0; feet sink
-        // toward the cap edges where the oval drops away.
-        var surfaceOffset = root.AddComponent<DinoSurfaceVisualOffset>();
-        surfaceOffset.surfaceCurve = surfaceCurve.transform;
-        surfaceOffset.curveHeight = 0.20f;
-        surfaceOffset.smoothSpeed = 10f;
+        var bridge = root.AddComponent<DinoAnimatorBridge>();
+        bridge.animator = animator;
+        bridge.spriteRenderer = sr;
 
         return root;
     }
